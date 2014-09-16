@@ -5,21 +5,22 @@
   use std::num::from_str_radix;
   use std::char;
 
-fn slice_eq(input: &str, pos: uint, m: &str) -> Result<(uint, ()), uint> {
+enum ParseResult<T> { Matched(uint, T), Failed, }
+fn slice_eq(input: &str, pos: uint, m: &str) -> ParseResult<()> {
     #![inline]
     #![allow(dead_code)]
     let l = m.len();
     if input.len() >= pos + l &&
            input.as_bytes().slice(pos, pos + l) == m.as_bytes() {
-        Ok((pos + l, ()))
-    } else { Err(pos) }
+        Matched(pos + l, ())
+    } else { Failed }
 }
-fn any_char(input: &str, pos: uint) -> Result<(uint, ()), uint> {
+fn any_char(input: &str, pos: uint) -> ParseResult<()> {
     #![inline]
     #![allow(dead_code)]
     if input.len() > pos {
-        Ok((input.char_range_at(pos).next, ()))
-    } else { Err(pos) }
+        Matched(input.char_range_at(pos).next, ())
+    } else { Failed }
 }
 fn pos_to_line(input: &str, pos: uint) -> uint {
     let mut remaining = pos as int;
@@ -31,25 +32,23 @@ fn pos_to_line(input: &str, pos: uint) -> uint {
     }
     return lineno;
 }
-fn parse_grammar(input: &str, pos: uint) -> Result<(uint, Grammar), uint> {
+fn parse_grammar(input: &str, pos: uint) -> ParseResult<Grammar> {
     {
         let start_pos = pos;
         {
             let seq_res = parse___(input, pos);
             match seq_res {
-                Err(pos) => { Err(pos) }
-                Ok((pos, _)) => {
+                Matched(pos, _) => {
                     {
                         let seq_res =
                             match parse_action(input, pos) {
-                                Ok((newpos, value)) => {
-                                    Ok((newpos, Some(value)))
+                                Matched(newpos, value) => {
+                                    Matched(newpos, Some(value))
                                 }
-                                Err(..) => { Ok((pos, None)) }
+                                Failed => { Matched(pos, None) }
                             };
                         match seq_res {
-                            Err(pos) => { Err(pos) }
-                            Ok((pos, header)) => {
+                            Matched(pos, header) => {
                                 {
                                     let seq_res =
                                         {
@@ -61,18 +60,18 @@ fn parse_grammar(input: &str, pos: uint) -> Result<(uint, Grammar), uint> {
                                                     parse_rust_use(input,
                                                                    pos);
                                                 match step_res {
-                                                    Ok((newpos, value)) => {
+                                                    Matched(newpos, value) =>
+                                                    {
                                                         repeat_pos = newpos;
                                                         repeat_value.push(value);
                                                     }
-                                                    Err(..) => { break ; }
+                                                    Failed => { break ; }
                                                 }
                                             }
-                                            Ok((repeat_pos, repeat_value))
+                                            Matched(repeat_pos, repeat_value)
                                         };
                                     match seq_res {
-                                        Err(pos) => { Err(pos) }
-                                        Ok((pos, imports)) => {
+                                        Matched(pos, imports) => {
                                             {
                                                 let seq_res =
                                                     {
@@ -87,152 +86,152 @@ fn parse_grammar(input: &str, pos: uint) -> Result<(uint, Grammar), uint> {
                                                                 parse_rule(input,
                                                                            pos);
                                                             match step_res {
-                                                                Ok((newpos,
-                                                                    value)) =>
-                                                                {
+                                                                Matched(newpos,
+                                                                        value)
+                                                                => {
                                                                     repeat_pos
                                                                         =
                                                                         newpos;
                                                                     repeat_value.push(value);
                                                                 }
-                                                                Err(..) => {
+                                                                Failed => {
                                                                     break ;
                                                                 }
                                                             }
                                                         }
-                                                        Ok((repeat_pos,
-                                                            repeat_value))
+                                                        Matched(repeat_pos,
+                                                                repeat_value)
                                                     };
                                                 match seq_res {
-                                                    Err(pos) => { Err(pos) }
-                                                    Ok((pos, rules)) => {
+                                                    Matched(pos, rules) => {
                                                         {
                                                             let match_str =
                                                                 input.slice(start_pos,
                                                                             pos);
-                                                            Ok((pos,
-                                                                Grammar{initializer:
-                                                                            header,
-                                                                        imports:
-                                                                            imports,
-                                                                        rules:
-                                                                            rules,}))
+                                                            Matched(pos,
+                                                                    Grammar{initializer:
+                                                                                header,
+                                                                            imports:
+                                                                                imports,
+                                                                            rules:
+                                                                                rules,})
                                                         }
                                                     }
+                                                    Failed => Failed,
                                                 }
                                             }
                                         }
+                                        Failed => Failed,
                                     }
                                 }
                             }
+                            Failed => Failed,
                         }
                     }
                 }
+                Failed => Failed,
             }
         }
     }
 }
-fn parse_rule(input: &str, pos: uint) -> Result<(uint, Rule), uint> {
+fn parse_rule(input: &str, pos: uint) -> ParseResult<Rule> {
     {
         let start_pos = pos;
         {
             let seq_res = parse_exportflag(input, pos);
             match seq_res {
-                Err(pos) => { Err(pos) }
-                Ok((pos, exported)) => {
+                Matched(pos, exported) => {
                     {
                         let seq_res = parse_identifier(input, pos);
                         match seq_res {
-                            Err(pos) => { Err(pos) }
-                            Ok((pos, name)) => {
+                            Matched(pos, name) => {
                                 {
                                     let seq_res =
                                         parse_returntype(input, pos);
                                     match seq_res {
-                                        Err(pos) => { Err(pos) }
-                                        Ok((pos, returns)) => {
+                                        Matched(pos, returns) => {
                                             {
                                                 let seq_res =
                                                     parse_equals(input, pos);
                                                 match seq_res {
-                                                    Err(pos) => { Err(pos) }
-                                                    Ok((pos, _)) => {
+                                                    Matched(pos, _) => {
                                                         {
                                                             let seq_res =
                                                                 parse_expression(input,
                                                                                  pos);
                                                             match seq_res {
-                                                                Err(pos) => {
-                                                                    Err(pos)
-                                                                }
-                                                                Ok((pos,
-                                                                    expression))
+                                                                Matched(pos,
+                                                                        expression)
                                                                 => {
                                                                     {
                                                                         let seq_res =
                                                                             match parse_semicolon(input,
                                                                                                   pos)
                                                                                 {
-                                                                                Ok((newpos,
-                                                                                    value))
+                                                                                Matched(newpos,
+                                                                                        value)
                                                                                 =>
                                                                                 {
-                                                                                    Ok((newpos,
-                                                                                        Some(value)))
+                                                                                    Matched(newpos,
+                                                                                            Some(value))
                                                                                 }
-                                                                                Err(..)
+                                                                                Failed
                                                                                 =>
                                                                                 {
-                                                                                    Ok((pos,
-                                                                                        None))
+                                                                                    Matched(pos,
+                                                                                            None)
                                                                                 }
                                                                             };
                                                                         match seq_res
                                                                             {
-                                                                            Err(pos)
-                                                                            =>
-                                                                            {
-                                                                                Err(pos)
-                                                                            }
-                                                                            Ok((pos,
-                                                                                _))
+                                                                            Matched(pos,
+                                                                                    _)
                                                                             =>
                                                                             {
                                                                                 {
                                                                                     let match_str =
                                                                                         input.slice(start_pos,
                                                                                                     pos);
-                                                                                    Ok((pos,
-                                                                                        Rule{name:
-                                                                                                 name,
-                                                                                             expr:
-                                                                                                 box() expression,
-                                                                                             ret_type:
-                                                                                                 returns,
-                                                                                             exported:
-                                                                                                 exported,}))
+                                                                                    Matched(pos,
+                                                                                            Rule{name:
+                                                                                                     name,
+                                                                                                 expr:
+                                                                                                     box() expression,
+                                                                                                 ret_type:
+                                                                                                     returns,
+                                                                                                 exported:
+                                                                                                     exported,})
                                                                                 }
                                                                             }
+                                                                            Failed
+                                                                            =>
+                                                                            Failed,
                                                                         }
                                                                     }
                                                                 }
+                                                                Failed =>
+                                                                Failed,
                                                             }
                                                         }
                                                     }
+                                                    Failed => Failed,
                                                 }
                                             }
                                         }
+                                        Failed => Failed,
                                     }
                                 }
                             }
+                            Failed => Failed,
                         }
                     }
                 }
+                Failed => Failed,
             }
         }
     }
 }
-fn parse_exportflag(input: &str, pos: uint) -> Result<(uint, bool), uint> {
+fn parse_exportflag(input: &str, pos: uint) -> ParseResult<bool> {
     {
         let choice_res =
             {
@@ -243,51 +242,51 @@ fn parse_exportflag(input: &str, pos: uint) -> Result<(uint, bool), uint> {
                             let choice_res =
                                 slice_eq(input, pos, "#[export]");
                             match choice_res {
-                                Ok((pos, value)) => Ok((pos, value)),
-                                Err(..) => slice_eq(input, pos, "#[pub]"),
+                                Matched(pos, value) => Matched(pos, value),
+                                Failed => slice_eq(input, pos, "#[pub]"),
                             }
                         };
                     match seq_res {
-                        Err(pos) => { Err(pos) }
-                        Ok((pos, _)) => {
+                        Matched(pos, _) => {
                             {
                                 let seq_res = parse___(input, pos);
                                 match seq_res {
-                                    Err(pos) => { Err(pos) }
-                                    Ok((pos, _)) => {
+                                    Matched(pos, _) => {
                                         {
                                             let match_str =
                                                 input.slice(start_pos, pos);
-                                            Ok((pos, true))
+                                            Matched(pos, true)
                                         }
                                     }
+                                    Failed => Failed,
                                 }
                             }
                         }
+                        Failed => Failed,
                     }
                 }
             };
         match choice_res {
-            Ok((pos, value)) => Ok((pos, value)),
-            Err(..) => {
+            Matched(pos, value) => Matched(pos, value),
+            Failed => {
                 let start_pos = pos;
                 {
                     let seq_res = slice_eq(input, pos, "");
                     match seq_res {
-                        Err(pos) => { Err(pos) }
-                        Ok((pos, _)) => {
+                        Matched(pos, _) => {
                             {
                                 let match_str = input.slice(start_pos, pos);
-                                Ok((pos, false))
+                                Matched(pos, false)
                             }
                         }
+                        Failed => Failed,
                     }
                 }
             }
         }
     }
 }
-fn parse_returntype(input: &str, pos: uint) -> Result<(uint, String), uint> {
+fn parse_returntype(input: &str, pos: uint) -> ParseResult<String> {
     {
         let choice_res =
             {
@@ -295,8 +294,7 @@ fn parse_returntype(input: &str, pos: uint) -> Result<(uint, String), uint> {
                 {
                     let seq_res = parse_returns(input, pos);
                     match seq_res {
-                        Err(pos) => { Err(pos) }
-                        Ok((pos, _)) => {
+                        Matched(pos, _) => {
                             {
                                 let seq_res =
                                     {
@@ -305,70 +303,67 @@ fn parse_returntype(input: &str, pos: uint) -> Result<(uint, String), uint> {
                                             let seq_res =
                                                 parse_rust_type(input, pos);
                                             match seq_res {
-                                                Err(pos) => { Err(pos) }
-                                                Ok((pos, _)) => {
+                                                Matched(pos, _) => {
                                                     {
                                                         let match_str =
                                                             input.slice(start_pos,
                                                                         pos);
-                                                        Ok((pos,
-                                                            match_str.trim().to_string()))
+                                                        Matched(pos,
+                                                                match_str.trim().to_string())
                                                     }
                                                 }
+                                                Failed => Failed,
                                             }
                                         }
                                     };
                                 match seq_res {
-                                    Err(pos) => { Err(pos) }
-                                    Ok((pos, tp)) => {
+                                    Matched(pos, tp) => {
                                         {
                                             let match_str =
                                                 input.slice(start_pos, pos);
-                                            Ok((pos, tp))
+                                            Matched(pos, tp)
                                         }
                                     }
+                                    Failed => Failed,
                                 }
                             }
                         }
+                        Failed => Failed,
                     }
                 }
             };
         match choice_res {
-            Ok((pos, value)) => Ok((pos, value)),
-            Err(..) => {
+            Matched(pos, value) => Matched(pos, value),
+            Failed => {
                 let start_pos = pos;
                 {
                     let match_str = input.slice(start_pos, pos);
-                    Ok((pos, "()".to_string()))
+                    Matched(pos, "()".to_string())
                 }
             }
         }
     }
 }
-fn parse_rust_use(input: &str, pos: uint) -> Result<(uint, RustUse), uint> {
+fn parse_rust_use(input: &str, pos: uint) -> ParseResult<RustUse> {
     {
         let start_pos = pos;
         {
             let seq_res = slice_eq(input, pos, "use");
             match seq_res {
-                Err(pos) => { Err(pos) }
-                Ok((pos, _)) => {
+                Matched(pos, _) => {
                     {
                         let seq_res = parse___(input, pos);
                         match seq_res {
-                            Err(pos) => { Err(pos) }
-                            Ok((pos, _)) => {
+                            Matched(pos, _) => {
                                 {
                                     let seq_res = parse_rust_path(input, pos);
                                     match seq_res {
-                                        Err(pos) => { Err(pos) }
-                                        Ok((pos, p)) => {
+                                        Matched(pos, p) => {
                                             {
                                                 let seq_res =
                                                     parse___(input, pos);
                                                 match seq_res {
-                                                    Err(pos) => { Err(pos) }
-                                                    Ok((pos, _)) => {
+                                                    Matched(pos, _) => {
                                                         {
                                                             let seq_res =
                                                                 {
@@ -383,13 +378,8 @@ fn parse_rust_use(input: &str, pos: uint) -> Result<(uint, RustUse), uint> {
                                                                                              "::");
                                                                                 match seq_res
                                                                                     {
-                                                                                    Err(pos)
-                                                                                    =>
-                                                                                    {
-                                                                                        Err(pos)
-                                                                                    }
-                                                                                    Ok((pos,
-                                                                                        _))
+                                                                                    Matched(pos,
+                                                                                            _)
                                                                                     =>
                                                                                     {
                                                                                         {
@@ -398,13 +388,8 @@ fn parse_rust_use(input: &str, pos: uint) -> Result<(uint, RustUse), uint> {
                                                                                                          pos);
                                                                                             match seq_res
                                                                                                 {
-                                                                                                Err(pos)
-                                                                                                =>
-                                                                                                {
-                                                                                                    Err(pos)
-                                                                                                }
-                                                                                                Ok((pos,
-                                                                                                    _))
+                                                                                                Matched(pos,
+                                                                                                        _)
                                                                                                 =>
                                                                                                 {
                                                                                                     {
@@ -414,13 +399,8 @@ fn parse_rust_use(input: &str, pos: uint) -> Result<(uint, RustUse), uint> {
                                                                                                                      "*");
                                                                                                         match seq_res
                                                                                                             {
-                                                                                                            Err(pos)
-                                                                                                            =>
-                                                                                                            {
-                                                                                                                Err(pos)
-                                                                                                            }
-                                                                                                            Ok((pos,
-                                                                                                                _))
+                                                                                                            Matched(pos,
+                                                                                                                    _)
                                                                                                             =>
                                                                                                             {
                                                                                                                 {
@@ -429,43 +409,50 @@ fn parse_rust_use(input: &str, pos: uint) -> Result<(uint, RustUse), uint> {
                                                                                                                                  pos);
                                                                                                                     match seq_res
                                                                                                                         {
-                                                                                                                        Err(pos)
-                                                                                                                        =>
-                                                                                                                        {
-                                                                                                                            Err(pos)
-                                                                                                                        }
-                                                                                                                        Ok((pos,
-                                                                                                                            _))
+                                                                                                                        Matched(pos,
+                                                                                                                                _)
                                                                                                                         =>
                                                                                                                         {
                                                                                                                             {
                                                                                                                                 let match_str =
                                                                                                                                     input.slice(start_pos,
                                                                                                                                                 pos);
-                                                                                                                                Ok((pos,
-                                                                                                                                    RustUseGlob(p.clone())))
+                                                                                                                                Matched(pos,
+                                                                                                                                        RustUseGlob(p.clone()))
                                                                                                                             }
                                                                                                                         }
+                                                                                                                        Failed
+                                                                                                                        =>
+                                                                                                                        Failed,
                                                                                                                     }
                                                                                                                 }
                                                                                                             }
+                                                                                                            Failed
+                                                                                                            =>
+                                                                                                            Failed,
                                                                                                         }
                                                                                                     }
                                                                                                 }
+                                                                                                Failed
+                                                                                                =>
+                                                                                                Failed,
                                                                                             }
                                                                                         }
                                                                                     }
+                                                                                    Failed
+                                                                                    =>
+                                                                                    Failed,
                                                                                 }
                                                                             }
                                                                         };
                                                                     match choice_res
                                                                         {
-                                                                        Ok((pos,
-                                                                            value))
+                                                                        Matched(pos,
+                                                                                value)
                                                                         =>
-                                                                        Ok((pos,
-                                                                            value)),
-                                                                        Err(..)
+                                                                        Matched(pos,
+                                                                                value),
+                                                                        Failed
                                                                         => {
                                                                             let choice_res =
                                                                                 {
@@ -478,13 +465,8 @@ fn parse_rust_use(input: &str, pos: uint) -> Result<(uint, RustUse), uint> {
                                                                                                      "::");
                                                                                         match seq_res
                                                                                             {
-                                                                                            Err(pos)
-                                                                                            =>
-                                                                                            {
-                                                                                                Err(pos)
-                                                                                            }
-                                                                                            Ok((pos,
-                                                                                                _))
+                                                                                            Matched(pos,
+                                                                                                    _)
                                                                                             =>
                                                                                             {
                                                                                                 {
@@ -493,13 +475,8 @@ fn parse_rust_use(input: &str, pos: uint) -> Result<(uint, RustUse), uint> {
                                                                                                                  pos);
                                                                                                     match seq_res
                                                                                                         {
-                                                                                                        Err(pos)
-                                                                                                        =>
-                                                                                                        {
-                                                                                                            Err(pos)
-                                                                                                        }
-                                                                                                        Ok((pos,
-                                                                                                            _))
+                                                                                                        Matched(pos,
+                                                                                                                _)
                                                                                                         =>
                                                                                                         {
                                                                                                             {
@@ -509,13 +486,8 @@ fn parse_rust_use(input: &str, pos: uint) -> Result<(uint, RustUse), uint> {
                                                                                                                              "{");
                                                                                                                 match seq_res
                                                                                                                     {
-                                                                                                                    Err(pos)
-                                                                                                                    =>
-                                                                                                                    {
-                                                                                                                        Err(pos)
-                                                                                                                    }
-                                                                                                                    Ok((pos,
-                                                                                                                        _))
+                                                                                                                    Matched(pos,
+                                                                                                                            _)
                                                                                                                     =>
                                                                                                                     {
                                                                                                                         {
@@ -524,13 +496,8 @@ fn parse_rust_use(input: &str, pos: uint) -> Result<(uint, RustUse), uint> {
                                                                                                                                          pos);
                                                                                                                             match seq_res
                                                                                                                                 {
-                                                                                                                                Err(pos)
-                                                                                                                                =>
-                                                                                                                                {
-                                                                                                                                    Err(pos)
-                                                                                                                                }
-                                                                                                                                Ok((pos,
-                                                                                                                                    _))
+                                                                                                                                Matched(pos,
+                                                                                                                                        _)
                                                                                                                                 =>
                                                                                                                                 {
                                                                                                                                     {
@@ -557,29 +524,27 @@ fn parse_rust_use(input: &str, pos: uint) -> Result<(uint, RustUse), uint> {
                                                                                                                                                                                  ",");
                                                                                                                                                                     match seq_res
                                                                                                                                                                         {
-                                                                                                                                                                        Err(pos)
-                                                                                                                                                                        =>
-                                                                                                                                                                        {
-                                                                                                                                                                            Err(pos)
-                                                                                                                                                                        }
-                                                                                                                                                                        Ok((pos,
-                                                                                                                                                                            _))
+                                                                                                                                                                        Matched(pos,
+                                                                                                                                                                                _)
                                                                                                                                                                         =>
                                                                                                                                                                         {
                                                                                                                                                                             parse___(input,
                                                                                                                                                                                      pos)
                                                                                                                                                                         }
+                                                                                                                                                                        Failed
+                                                                                                                                                                        =>
+                                                                                                                                                                        Failed,
                                                                                                                                                                     }
                                                                                                                                                                 };
                                                                                                                                                             match sep_res
                                                                                                                                                                 {
-                                                                                                                                                                Ok((newpos,
-                                                                                                                                                                    _))
+                                                                                                                                                                Matched(newpos,
+                                                                                                                                                                        _)
                                                                                                                                                                 =>
                                                                                                                                                                 {
                                                                                                                                                                     newpos
                                                                                                                                                                 }
-                                                                                                                                                                Err(..)
+                                                                                                                                                                Failed
                                                                                                                                                                 =>
                                                                                                                                                                 break
                                                                                                                                                                     ,
@@ -592,8 +557,8 @@ fn parse_rust_use(input: &str, pos: uint) -> Result<(uint, RustUse), uint> {
                                                                                                                                                                          pos);
                                                                                                                                                     match step_res
                                                                                                                                                         {
-                                                                                                                                                        Ok((newpos,
-                                                                                                                                                            value))
+                                                                                                                                                        Matched(newpos,
+                                                                                                                                                                value)
                                                                                                                                                         =>
                                                                                                                                                         {
                                                                                                                                                             repeat_pos
@@ -601,7 +566,7 @@ fn parse_rust_use(input: &str, pos: uint) -> Result<(uint, RustUse), uint> {
                                                                                                                                                                 newpos;
                                                                                                                                                             repeat_value.push(value);
                                                                                                                                                         }
-                                                                                                                                                        Err(..)
+                                                                                                                                                        Failed
                                                                                                                                                         =>
                                                                                                                                                         {
                                                                                                                                                             break
@@ -613,21 +578,16 @@ fn parse_rust_use(input: &str, pos: uint) -> Result<(uint, RustUse), uint> {
                                                                                                                                                        >=
                                                                                                                                                        1u
                                                                                                                                                    {
-                                                                                                                                                    Ok((repeat_pos,
-                                                                                                                                                        repeat_value))
+                                                                                                                                                    Matched(repeat_pos,
+                                                                                                                                                            repeat_value)
                                                                                                                                                 } else {
-                                                                                                                                                    Err(repeat_pos)
+                                                                                                                                                    Failed
                                                                                                                                                 }
                                                                                                                                             };
                                                                                                                                         match seq_res
                                                                                                                                             {
-                                                                                                                                            Err(pos)
-                                                                                                                                            =>
-                                                                                                                                            {
-                                                                                                                                                Err(pos)
-                                                                                                                                            }
-                                                                                                                                            Ok((pos,
-                                                                                                                                                names))
+                                                                                                                                            Matched(pos,
+                                                                                                                                                    names)
                                                                                                                                             =>
                                                                                                                                             {
                                                                                                                                                 {
@@ -637,13 +597,8 @@ fn parse_rust_use(input: &str, pos: uint) -> Result<(uint, RustUse), uint> {
                                                                                                                                                                  "}");
                                                                                                                                                     match seq_res
                                                                                                                                                         {
-                                                                                                                                                        Err(pos)
-                                                                                                                                                        =>
-                                                                                                                                                        {
-                                                                                                                                                            Err(pos)
-                                                                                                                                                        }
-                                                                                                                                                        Ok((pos,
-                                                                                                                                                            _))
+                                                                                                                                                        Matched(pos,
+                                                                                                                                                                _)
                                                                                                                                                         =>
                                                                                                                                                         {
                                                                                                                                                             {
@@ -652,53 +607,69 @@ fn parse_rust_use(input: &str, pos: uint) -> Result<(uint, RustUse), uint> {
                                                                                                                                                                              pos);
                                                                                                                                                                 match seq_res
                                                                                                                                                                     {
-                                                                                                                                                                    Err(pos)
-                                                                                                                                                                    =>
-                                                                                                                                                                    {
-                                                                                                                                                                        Err(pos)
-                                                                                                                                                                    }
-                                                                                                                                                                    Ok((pos,
-                                                                                                                                                                        _))
+                                                                                                                                                                    Matched(pos,
+                                                                                                                                                                            _)
                                                                                                                                                                     =>
                                                                                                                                                                     {
                                                                                                                                                                         {
                                                                                                                                                                             let match_str =
                                                                                                                                                                                 input.slice(start_pos,
                                                                                                                                                                                             pos);
-                                                                                                                                                                            Ok((pos,
-                                                                                                                                                                                RustUseList(p.clone(),
-                                                                                                                                                                                            names)))
+                                                                                                                                                                            Matched(pos,
+                                                                                                                                                                                    RustUseList(p.clone(),
+                                                                                                                                                                                                names))
                                                                                                                                                                         }
                                                                                                                                                                     }
+                                                                                                                                                                    Failed
+                                                                                                                                                                    =>
+                                                                                                                                                                    Failed,
                                                                                                                                                                 }
                                                                                                                                                             }
                                                                                                                                                         }
+                                                                                                                                                        Failed
+                                                                                                                                                        =>
+                                                                                                                                                        Failed,
                                                                                                                                                     }
                                                                                                                                                 }
                                                                                                                                             }
+                                                                                                                                            Failed
+                                                                                                                                            =>
+                                                                                                                                            Failed,
                                                                                                                                         }
                                                                                                                                     }
                                                                                                                                 }
+                                                                                                                                Failed
+                                                                                                                                =>
+                                                                                                                                Failed,
                                                                                                                             }
                                                                                                                         }
                                                                                                                     }
+                                                                                                                    Failed
+                                                                                                                    =>
+                                                                                                                    Failed,
                                                                                                                 }
                                                                                                             }
                                                                                                         }
+                                                                                                        Failed
+                                                                                                        =>
+                                                                                                        Failed,
                                                                                                     }
                                                                                                 }
                                                                                             }
+                                                                                            Failed
+                                                                                            =>
+                                                                                            Failed,
                                                                                         }
                                                                                     }
                                                                                 };
                                                                             match choice_res
                                                                                 {
-                                                                                Ok((pos,
-                                                                                    value))
+                                                                                Matched(pos,
+                                                                                        value)
                                                                                 =>
-                                                                                Ok((pos,
-                                                                                    value)),
-                                                                                Err(..)
+                                                                                Matched(pos,
+                                                                                        value),
+                                                                                Failed
                                                                                 =>
                                                                                 {
                                                                                     let start_pos =
@@ -710,23 +681,21 @@ fn parse_rust_use(input: &str, pos: uint) -> Result<(uint, RustUse), uint> {
                                                                                                      "");
                                                                                         match seq_res
                                                                                             {
-                                                                                            Err(pos)
-                                                                                            =>
-                                                                                            {
-                                                                                                Err(pos)
-                                                                                            }
-                                                                                            Ok((pos,
-                                                                                                _))
+                                                                                            Matched(pos,
+                                                                                                    _)
                                                                                             =>
                                                                                             {
                                                                                                 {
                                                                                                     let match_str =
                                                                                                         input.slice(start_pos,
                                                                                                                     pos);
-                                                                                                    Ok((pos,
-                                                                                                        RustUseSimple(p.clone())))
+                                                                                                    Matched(pos,
+                                                                                                            RustUseSimple(p.clone()))
                                                                                                 }
                                                                                             }
+                                                                                            Failed
+                                                                                            =>
+                                                                                            Failed,
                                                                                         }
                                                                                     }
                                                                                 }
@@ -735,11 +704,9 @@ fn parse_rust_use(input: &str, pos: uint) -> Result<(uint, RustUse), uint> {
                                                                     }
                                                                 };
                                                             match seq_res {
-                                                                Err(pos) => {
-                                                                    Err(pos)
-                                                                }
-                                                                Ok((pos, v))
-                                                                => {
+                                                                Matched(pos,
+                                                                        v) =>
+                                                                {
                                                                     {
                                                                         let seq_res =
                                                                             slice_eq(input,
@@ -747,13 +714,8 @@ fn parse_rust_use(input: &str, pos: uint) -> Result<(uint, RustUse), uint> {
                                                                                      ";");
                                                                         match seq_res
                                                                             {
-                                                                            Err(pos)
-                                                                            =>
-                                                                            {
-                                                                                Err(pos)
-                                                                            }
-                                                                            Ok((pos,
-                                                                                _))
+                                                                            Matched(pos,
+                                                                                    _)
                                                                             =>
                                                                             {
                                                                                 {
@@ -762,46 +724,53 @@ fn parse_rust_use(input: &str, pos: uint) -> Result<(uint, RustUse), uint> {
                                                                                                  pos);
                                                                                     match seq_res
                                                                                         {
-                                                                                        Err(pos)
-                                                                                        =>
-                                                                                        {
-                                                                                            Err(pos)
-                                                                                        }
-                                                                                        Ok((pos,
-                                                                                            _))
+                                                                                        Matched(pos,
+                                                                                                _)
                                                                                         =>
                                                                                         {
                                                                                             {
                                                                                                 let match_str =
                                                                                                     input.slice(start_pos,
                                                                                                                 pos);
-                                                                                                Ok((pos,
-                                                                                                    v))
+                                                                                                Matched(pos,
+                                                                                                        v)
                                                                                             }
                                                                                         }
+                                                                                        Failed
+                                                                                        =>
+                                                                                        Failed,
                                                                                     }
                                                                                 }
                                                                             }
+                                                                            Failed
+                                                                            =>
+                                                                            Failed,
                                                                         }
                                                                     }
                                                                 }
+                                                                Failed =>
+                                                                Failed,
                                                             }
                                                         }
                                                     }
+                                                    Failed => Failed,
                                                 }
                                             }
                                         }
+                                        Failed => Failed,
                                     }
                                 }
                             }
+                            Failed => Failed,
                         }
                     }
                 }
+                Failed => Failed,
             }
         }
     }
 }
-fn parse_rust_path(input: &str, pos: uint) -> Result<(uint, String), uint> {
+fn parse_rust_path(input: &str, pos: uint) -> ParseResult<String> {
     {
         let start_pos = pos;
         {
@@ -818,127 +787,119 @@ fn parse_rust_path(input: &str, pos: uint) -> Result<(uint, String), uint> {
                                         let seq_res =
                                             slice_eq(input, pos, "::");
                                         match seq_res {
-                                            Err(pos) => { Err(pos) }
-                                            Ok((pos, _)) => {
+                                            Matched(pos, _) => {
                                                 parse___(input, pos)
                                             }
+                                            Failed => Failed,
                                         }
                                     };
                                 match sep_res {
-                                    Ok((newpos, _)) => { newpos }
-                                    Err(..) => break ,
+                                    Matched(newpos, _) => { newpos }
+                                    Failed => break ,
                                 }
                             } else { pos };
                         let step_res = parse_identifier(input, pos);
                         match step_res {
-                            Ok((newpos, value)) => {
+                            Matched(newpos, value) => {
                                 repeat_pos = newpos;
                                 repeat_value.push(value);
                             }
-                            Err(..) => { break ; }
+                            Failed => { break ; }
                         }
                     }
                     if repeat_value.len() >= 1u {
-                        Ok((repeat_pos, ()))
-                    } else { Err(repeat_pos) }
+                        Matched(repeat_pos, ())
+                    } else { Failed }
                 };
             match seq_res {
-                Err(pos) => { Err(pos) }
-                Ok((pos, _)) => {
+                Matched(pos, _) => {
                     {
                         let match_str = input.slice(start_pos, pos);
-                        Ok((pos, match_str.to_string()))
+                        Matched(pos, match_str.to_string())
                     }
                 }
+                Failed => Failed,
             }
         }
     }
 }
-fn parse_rust_type(input: &str, pos: uint) -> Result<(uint, ()), uint> {
+fn parse_rust_type(input: &str, pos: uint) -> ParseResult<()> {
     {
         let choice_res =
             {
                 let seq_res = slice_eq(input, pos, "()");
                 match seq_res {
-                    Err(pos) => { Err(pos) }
-                    Ok((pos, _)) => { parse___(input, pos) }
+                    Matched(pos, _) => { parse___(input, pos) }
+                    Failed => Failed,
                 }
             };
         match choice_res {
-            Ok((pos, value)) => Ok((pos, value)),
-            Err(..) => {
+            Matched(pos, value) => Matched(pos, value),
+            Failed => {
                 let choice_res =
                     {
                         let seq_res = slice_eq(input, pos, "[");
                         match seq_res {
-                            Err(pos) => { Err(pos) }
-                            Ok((pos, _)) => {
+                            Matched(pos, _) => {
                                 {
                                     let seq_res = parse_rust_type(input, pos);
                                     match seq_res {
-                                        Err(pos) => { Err(pos) }
-                                        Ok((pos, _)) => {
+                                        Matched(pos, _) => {
                                             {
                                                 let seq_res =
                                                     slice_eq(input, pos, "]");
                                                 match seq_res {
-                                                    Err(pos) => { Err(pos) }
-                                                    Ok((pos, _)) => {
+                                                    Matched(pos, _) => {
                                                         parse___(input, pos)
                                                     }
+                                                    Failed => Failed,
                                                 }
                                             }
                                         }
+                                        Failed => Failed,
                                     }
                                 }
                             }
+                            Failed => Failed,
                         }
                     };
                 match choice_res {
-                    Ok((pos, value)) => Ok((pos, value)),
-                    Err(..) => {
+                    Matched(pos, value) => Matched(pos, value),
+                    Failed => {
                         let choice_res =
                             {
                                 let seq_res = slice_eq(input, pos, "&");
                                 match seq_res {
-                                    Err(pos) => { Err(pos) }
-                                    Ok((pos, _)) => {
+                                    Matched(pos, _) => {
                                         parse_rust_type(input, pos)
                                     }
+                                    Failed => Failed,
                                 }
                             };
                         match choice_res {
-                            Ok((pos, value)) => Ok((pos, value)),
-                            Err(..) => {
+                            Matched(pos, value) => Matched(pos, value),
+                            Failed => {
                                 let choice_res =
                                     {
                                         let seq_res =
                                             parse_identifier(input, pos);
                                         match seq_res {
-                                            Err(pos) => { Err(pos) }
-                                            Ok((pos, _)) => {
+                                            Matched(pos, _) => {
                                                 {
                                                     let seq_res =
                                                         slice_eq(input, pos,
                                                                  "<");
                                                     match seq_res {
-                                                        Err(pos) => {
-                                                            Err(pos)
-                                                        }
-                                                        Ok((pos, _)) => {
+                                                        Matched(pos, _) => {
                                                             {
                                                                 let seq_res =
                                                                     parse_rust_type(input,
                                                                                     pos);
                                                                 match seq_res
                                                                     {
-                                                                    Err(pos)
+                                                                    Matched(pos,
+                                                                            _)
                                                                     => {
-                                                                        Err(pos)
-                                                                    }
-                                                                    Ok((pos,
-                                                                        _)) =>
-                                                                    {
                                                                         {
                                                                             let seq_res =
                                                                                 slice_eq(input,
@@ -946,63 +907,66 @@ fn parse_rust_type(input: &str, pos: uint) -> Result<(uint, ()), uint> {
                                                                                          ">");
                                                                             match seq_res
                                                                                 {
-                                                                                Err(pos)
-                                                                                =>
-                                                                                {
-                                                                                    Err(pos)
-                                                                                }
-                                                                                Ok((pos,
-                                                                                    _))
+                                                                                Matched(pos,
+                                                                                        _)
                                                                                 =>
                                                                                 {
                                                                                     parse___(input,
                                                                                              pos)
                                                                                 }
+                                                                                Failed
+                                                                                =>
+                                                                                Failed,
                                                                             }
                                                                         }
                                                                     }
+                                                                    Failed =>
+                                                                    Failed,
                                                                 }
                                                             }
                                                         }
+                                                        Failed => Failed,
                                                     }
                                                 }
                                             }
+                                            Failed => Failed,
                                         }
                                     };
                                 match choice_res {
-                                    Ok((pos, value)) => Ok((pos, value)),
-                                    Err(..) => {
+                                    Matched(pos, value) =>
+                                    Matched(pos, value),
+                                    Failed => {
                                         let choice_res =
                                             {
                                                 let seq_res =
                                                     parse_identifier(input,
                                                                      pos);
                                                 match seq_res {
-                                                    Err(pos) => { Err(pos) }
-                                                    Ok((pos, _)) => {
+                                                    Matched(pos, _) => {
                                                         {
                                                             let seq_res =
                                                                 slice_eq(input,
                                                                          pos,
                                                                          "::");
                                                             match seq_res {
-                                                                Err(pos) => {
-                                                                    Err(pos)
-                                                                }
-                                                                Ok((pos, _))
-                                                                => {
+                                                                Matched(pos,
+                                                                        _) =>
+                                                                {
                                                                     parse_rust_type(input,
                                                                                     pos)
                                                                 }
+                                                                Failed =>
+                                                                Failed,
                                                             }
                                                         }
                                                     }
+                                                    Failed => Failed,
                                                 }
                                             };
                                         match choice_res {
-                                            Ok((pos, value)) =>
-                                            Ok((pos, value)),
-                                            Err(..) => {
+                                            Matched(pos, value) =>
+                                            Matched(pos, value),
+                                            Failed => {
                                                 let choice_res =
                                                     {
                                                         let seq_res =
@@ -1010,10 +974,8 @@ fn parse_rust_type(input: &str, pos: uint) -> Result<(uint, ()), uint> {
                                                                      pos,
                                                                      "(");
                                                         match seq_res {
-                                                            Err(pos) => {
-                                                                Err(pos)
-                                                            }
-                                                            Ok((pos, _)) => {
+                                                            Matched(pos, _) =>
+                                                            {
                                                                 {
                                                                     let seq_res =
                                                                         {
@@ -1037,13 +999,8 @@ fn parse_rust_type(input: &str, pos: uint) -> Result<(uint, ()), uint> {
                                                                                                              pos);
                                                                                                 match seq_res
                                                                                                     {
-                                                                                                    Err(pos)
-                                                                                                    =>
-                                                                                                    {
-                                                                                                        Err(pos)
-                                                                                                    }
-                                                                                                    Ok((pos,
-                                                                                                        _))
+                                                                                                    Matched(pos,
+                                                                                                            _)
                                                                                                     =>
                                                                                                     {
                                                                                                         {
@@ -1053,32 +1010,33 @@ fn parse_rust_type(input: &str, pos: uint) -> Result<(uint, ()), uint> {
                                                                                                                          ",");
                                                                                                             match seq_res
                                                                                                                 {
-                                                                                                                Err(pos)
-                                                                                                                =>
-                                                                                                                {
-                                                                                                                    Err(pos)
-                                                                                                                }
-                                                                                                                Ok((pos,
-                                                                                                                    _))
+                                                                                                                Matched(pos,
+                                                                                                                        _)
                                                                                                                 =>
                                                                                                                 {
                                                                                                                     parse___(input,
                                                                                                                              pos)
                                                                                                                 }
+                                                                                                                Failed
+                                                                                                                =>
+                                                                                                                Failed,
                                                                                                             }
                                                                                                         }
                                                                                                     }
+                                                                                                    Failed
+                                                                                                    =>
+                                                                                                    Failed,
                                                                                                 }
                                                                                             };
                                                                                         match sep_res
                                                                                             {
-                                                                                            Ok((newpos,
-                                                                                                _))
+                                                                                            Matched(newpos,
+                                                                                                    _)
                                                                                             =>
                                                                                             {
                                                                                                 newpos
                                                                                             }
-                                                                                            Err(..)
+                                                                                            Failed
                                                                                             =>
                                                                                             break
                                                                                                 ,
@@ -1091,8 +1049,8 @@ fn parse_rust_type(input: &str, pos: uint) -> Result<(uint, ()), uint> {
                                                                                                     pos);
                                                                                 match step_res
                                                                                     {
-                                                                                    Ok((newpos,
-                                                                                        value))
+                                                                                    Matched(newpos,
+                                                                                            value)
                                                                                     =>
                                                                                     {
                                                                                         repeat_pos
@@ -1100,7 +1058,7 @@ fn parse_rust_type(input: &str, pos: uint) -> Result<(uint, ()), uint> {
                                                                                             newpos;
                                                                                         repeat_value.push(value);
                                                                                     }
-                                                                                    Err(..)
+                                                                                    Failed
                                                                                     =>
                                                                                     {
                                                                                         break
@@ -1112,20 +1070,16 @@ fn parse_rust_type(input: &str, pos: uint) -> Result<(uint, ()), uint> {
                                                                                    >=
                                                                                    1u
                                                                                {
-                                                                                Ok((repeat_pos,
-                                                                                    ()))
+                                                                                Matched(repeat_pos,
+                                                                                        ())
                                                                             } else {
-                                                                                Err(repeat_pos)
+                                                                                Failed
                                                                             }
                                                                         };
                                                                     match seq_res
                                                                         {
-                                                                        Err(pos)
-                                                                        => {
-                                                                            Err(pos)
-                                                                        }
-                                                                        Ok((pos,
-                                                                            _))
+                                                                        Matched(pos,
+                                                                                _)
                                                                         => {
                                                                             {
                                                                                 let seq_res =
@@ -1134,42 +1088,43 @@ fn parse_rust_type(input: &str, pos: uint) -> Result<(uint, ()), uint> {
                                                                                              ")");
                                                                                 match seq_res
                                                                                     {
-                                                                                    Err(pos)
-                                                                                    =>
-                                                                                    {
-                                                                                        Err(pos)
-                                                                                    }
-                                                                                    Ok((pos,
-                                                                                        _))
+                                                                                    Matched(pos,
+                                                                                            _)
                                                                                     =>
                                                                                     {
                                                                                         parse___(input,
                                                                                                  pos)
                                                                                     }
+                                                                                    Failed
+                                                                                    =>
+                                                                                    Failed,
                                                                                 }
                                                                             }
                                                                         }
+                                                                        Failed
+                                                                        =>
+                                                                        Failed,
                                                                     }
                                                                 }
                                                             }
+                                                            Failed => Failed,
                                                         }
                                                     };
                                                 match choice_res {
-                                                    Ok((pos, value)) =>
-                                                    Ok((pos, value)),
-                                                    Err(..) => {
+                                                    Matched(pos, value) =>
+                                                    Matched(pos, value),
+                                                    Failed => {
                                                         let seq_res =
                                                             parse_identifier(input,
                                                                              pos);
                                                         match seq_res {
-                                                            Err(pos) => {
-                                                                Err(pos)
-                                                            }
-                                                            Ok((pos, _)) => {
+                                                            Matched(pos, _) =>
+                                                            {
                                                                 slice_eq(input,
                                                                          pos,
                                                                          "")
                                                             }
+                                                            Failed => Failed,
                                                         }
                                                     }
                                                 }
@@ -1185,17 +1140,16 @@ fn parse_rust_type(input: &str, pos: uint) -> Result<(uint, ()), uint> {
         }
     }
 }
-fn parse_expression(input: &str, pos: uint) -> Result<(uint, Expr), uint> {
+fn parse_expression(input: &str, pos: uint) -> ParseResult<Expr> {
     parse_choice(input, pos)
 }
-fn parse_choice(input: &str, pos: uint) -> Result<(uint, Expr), uint> {
+fn parse_choice(input: &str, pos: uint) -> ParseResult<Expr> {
     {
         let start_pos = pos;
         {
             let seq_res = parse_sequence(input, pos);
             match seq_res {
-                Err(pos) => { Err(pos) }
-                Ok((pos, head)) => {
+                Matched(pos, head) => {
                     {
                         let seq_res =
                             {
@@ -1210,64 +1164,65 @@ fn parse_choice(input: &str, pos: uint) -> Result<(uint, Expr), uint> {
                                                 let seq_res =
                                                     parse_slash(input, pos);
                                                 match seq_res {
-                                                    Err(pos) => { Err(pos) }
-                                                    Ok((pos, _)) => {
+                                                    Matched(pos, _) => {
                                                         {
                                                             let seq_res =
                                                                 parse_sequence(input,
                                                                                pos);
                                                             match seq_res {
-                                                                Err(pos) => {
-                                                                    Err(pos)
-                                                                }
-                                                                Ok((pos, s))
-                                                                => {
+                                                                Matched(pos,
+                                                                        s) =>
+                                                                {
                                                                     {
                                                                         let match_str =
                                                                             input.slice(start_pos,
                                                                                         pos);
-                                                                        Ok((pos,
-                                                                            s))
+                                                                        Matched(pos,
+                                                                                s)
                                                                     }
                                                                 }
+                                                                Failed =>
+                                                                Failed,
                                                             }
                                                         }
                                                     }
+                                                    Failed => Failed,
                                                 }
                                             }
                                         };
                                     match step_res {
-                                        Ok((newpos, value)) => {
+                                        Matched(newpos, value) => {
                                             repeat_pos = newpos;
                                             repeat_value.push(value);
                                         }
-                                        Err(..) => { break ; }
+                                        Failed => { break ; }
                                     }
                                 }
-                                Ok((repeat_pos, repeat_value))
+                                Matched(repeat_pos, repeat_value)
                             };
                         match seq_res {
-                            Err(pos) => { Err(pos) }
-                            Ok((pos, tail)) => {
+                            Matched(pos, tail) => {
                                 {
                                     let match_str =
                                         input.slice(start_pos, pos);
-                                    Ok((pos,
-                                        if tail.len() > 0 {
-                                            let mut list = tail;
-                                            list.insert(0, head);
-                                            ChoiceExpr(list)
-                                        } else { head }))
+                                    Matched(pos,
+                                            if tail.len() > 0 {
+                                                let mut list = tail;
+                                                list.insert(0, head);
+                                                ChoiceExpr(list)
+                                            } else { head })
                                 }
                             }
+                            Failed => Failed,
                         }
                     }
                 }
+                Failed => Failed,
             }
         }
     }
 }
-fn parse_sequence(input: &str, pos: uint) -> Result<(uint, Expr), uint> {
+fn parse_sequence(input: &str, pos: uint) -> ParseResult<Expr> {
     {
         let choice_res =
             {
@@ -1281,39 +1236,40 @@ fn parse_sequence(input: &str, pos: uint) -> Result<(uint, Expr), uint> {
                                 let pos = repeat_pos;
                                 let step_res = parse_labeled(input, pos);
                                 match step_res {
-                                    Ok((newpos, value)) => {
+                                    Matched(newpos, value) => {
                                         repeat_pos = newpos;
                                         repeat_value.push(value);
                                     }
-                                    Err(..) => { break ; }
+                                    Failed => { break ; }
                                 }
                             }
-                            Ok((repeat_pos, repeat_value))
+                            Matched(repeat_pos, repeat_value)
                         };
                     match seq_res {
-                        Err(pos) => { Err(pos) }
-                        Ok((pos, elements)) => {
+                        Matched(pos, elements) => {
                             {
                                 let seq_res = parse_action(input, pos);
                                 match seq_res {
-                                    Err(pos) => { Err(pos) }
-                                    Ok((pos, code)) => {
+                                    Matched(pos, code) => {
                                         {
                                             let match_str =
                                                 input.slice(start_pos, pos);
-                                            Ok((pos,
-                                                ActionExpr(elements, code)))
+                                            Matched(pos,
+                                                    ActionExpr(elements,
+                                                               code))
                                         }
                                     }
+                                    Failed => Failed,
                                 }
                             }
                         }
+                        Failed => Failed,
                     }
                 }
             };
         match choice_res {
-            Ok((pos, value)) => Ok((pos, value)),
-            Err(..) => {
+            Matched(pos, value) => Matched(pos, value),
+            Failed => {
                 let start_pos = pos;
                 {
                     let seq_res =
@@ -1324,35 +1280,35 @@ fn parse_sequence(input: &str, pos: uint) -> Result<(uint, Expr), uint> {
                                 let pos = repeat_pos;
                                 let step_res = parse_prefixed(input, pos);
                                 match step_res {
-                                    Ok((newpos, value)) => {
+                                    Matched(newpos, value) => {
                                         repeat_pos = newpos;
                                         repeat_value.push(value);
                                     }
-                                    Err(..) => { break ; }
+                                    Failed => { break ; }
                                 }
                             }
-                            Ok((repeat_pos, repeat_value))
+                            Matched(repeat_pos, repeat_value)
                         };
                     match seq_res {
-                        Err(pos) => { Err(pos) }
-                        Ok((pos, elements)) => {
+                        Matched(pos, elements) => {
                             {
                                 let match_str = input.slice(start_pos, pos);
-                                Ok((pos,
-                                    if elements.len() != 1 {
-                                        SequenceExpr(elements)
-                                    } else {
-                                        elements.move_iter().next().unwrap()
-                                    }))
+                                Matched(pos,
+                                        if elements.len() != 1 {
+                                            SequenceExpr(elements)
+                                        } else {
+                                            elements.move_iter().next().unwrap()
+                                        })
                             }
                         }
+                        Failed => Failed,
                     }
                 }
             }
         }
     }
 }
-fn parse_labeled(input: &str, pos: uint) -> Result<(uint, TaggedExpr), uint> {
+fn parse_labeled(input: &str, pos: uint) -> ParseResult<TaggedExpr> {
     {
         let choice_res =
             {
@@ -1360,62 +1316,62 @@ fn parse_labeled(input: &str, pos: uint) -> Result<(uint, TaggedExpr), uint> {
                 {
                     let seq_res = parse_identifier(input, pos);
                     match seq_res {
-                        Err(pos) => { Err(pos) }
-                        Ok((pos, label)) => {
+                        Matched(pos, label) => {
                             {
                                 let seq_res = parse_colon(input, pos);
                                 match seq_res {
-                                    Err(pos) => { Err(pos) }
-                                    Ok((pos, _)) => {
+                                    Matched(pos, _) => {
                                         {
                                             let seq_res =
                                                 parse_prefixed(input, pos);
                                             match seq_res {
-                                                Err(pos) => { Err(pos) }
-                                                Ok((pos, expression)) => {
+                                                Matched(pos, expression) => {
                                                     {
                                                         let match_str =
                                                             input.slice(start_pos,
                                                                         pos);
-                                                        Ok((pos,
-                                                            TaggedExpr{name:
-                                                                           Some(label),
-                                                                       expr:
-                                                                           box() expression,}))
+                                                        Matched(pos,
+                                                                TaggedExpr{name:
+                                                                               Some(label),
+                                                                           expr:
+                                                                               box() expression,})
                                                     }
                                                 }
+                                                Failed => Failed,
                                             }
                                         }
                                     }
+                                    Failed => Failed,
                                 }
                             }
                         }
+                        Failed => Failed,
                     }
                 }
             };
         match choice_res {
-            Ok((pos, value)) => Ok((pos, value)),
-            Err(..) => {
+            Matched(pos, value) => Matched(pos, value),
+            Failed => {
                 let start_pos = pos;
                 {
                     let seq_res = parse_prefixed(input, pos);
                     match seq_res {
-                        Err(pos) => { Err(pos) }
-                        Ok((pos, expr)) => {
+                        Matched(pos, expr) => {
                             {
                                 let match_str = input.slice(start_pos, pos);
-                                Ok((pos,
-                                    TaggedExpr{name: None,
-                                               expr: box() expr,}))
+                                Matched(pos,
+                                        TaggedExpr{name: None,
+                                                   expr: box() expr,})
                             }
                         }
+                        Failed => Failed,
                     }
                 }
             }
         }
     }
 }
-fn parse_prefixed(input: &str, pos: uint) -> Result<(uint, Expr), uint> {
+fn parse_prefixed(input: &str, pos: uint) -> ParseResult<Expr> {
     {
         let choice_res =
             {
@@ -1423,91 +1379,92 @@ fn parse_prefixed(input: &str, pos: uint) -> Result<(uint, Expr), uint> {
                 {
                     let seq_res = parse_dollar(input, pos);
                     match seq_res {
-                        Err(pos) => { Err(pos) }
-                        Ok((pos, _)) => {
+                        Matched(pos, _) => {
                             {
                                 let seq_res = parse_suffixed(input, pos);
                                 match seq_res {
-                                    Err(pos) => { Err(pos) }
-                                    Ok((pos, expression)) => {
+                                    Matched(pos, expression) => {
                                         {
                                             let match_str =
                                                 input.slice(start_pos, pos);
-                                            Ok((pos, expression))
+                                            Matched(pos, expression)
                                         }
                                     }
+                                    Failed => Failed,
                                 }
                             }
                         }
+                        Failed => Failed,
                     }
                 }
             };
         match choice_res {
-            Ok((pos, value)) => Ok((pos, value)),
-            Err(..) => {
+            Matched(pos, value) => Matched(pos, value),
+            Failed => {
                 let choice_res =
                     {
                         let start_pos = pos;
                         {
                             let seq_res = parse_and(input, pos);
                             match seq_res {
-                                Err(pos) => { Err(pos) }
-                                Ok((pos, _)) => {
+                                Matched(pos, _) => {
                                     {
                                         let seq_res =
                                             parse_suffixed(input, pos);
                                         match seq_res {
-                                            Err(pos) => { Err(pos) }
-                                            Ok((pos, expression)) => {
+                                            Matched(pos, expression) => {
                                                 {
                                                     let match_str =
                                                         input.slice(start_pos,
                                                                     pos);
-                                                    Ok((pos,
-                                                        PosAssertExpr(box() expression)))
+                                                    Matched(pos,
+                                                            PosAssertExpr(box() expression))
                                                 }
                                             }
+                                            Failed => Failed,
                                         }
                                     }
                                 }
+                                Failed => Failed,
                             }
                         }
                     };
                 match choice_res {
-                    Ok((pos, value)) => Ok((pos, value)),
-                    Err(..) => {
+                    Matched(pos, value) => Matched(pos, value),
+                    Failed => {
                         let choice_res =
                             {
                                 let start_pos = pos;
                                 {
                                     let seq_res = parse_not(input, pos);
                                     match seq_res {
-                                        Err(pos) => { Err(pos) }
-                                        Ok((pos, _)) => {
+                                        Matched(pos, _) => {
                                             {
                                                 let seq_res =
                                                     parse_suffixed(input,
                                                                    pos);
                                                 match seq_res {
-                                                    Err(pos) => { Err(pos) }
-                                                    Ok((pos, expression)) => {
+                                                    Matched(pos, expression)
+                                                    => {
                                                         {
                                                             let match_str =
                                                                 input.slice(start_pos,
                                                                             pos);
-                                                            Ok((pos,
-                                                                NegAssertExpr(box() expression)))
+                                                            Matched(pos,
+                                                                    NegAssertExpr(box() expression))
                                                         }
                                                     }
+                                                    Failed => Failed,
                                                 }
                                             }
                                         }
+                                        Failed => Failed,
                                     }
                                 }
                             };
                         match choice_res {
-                            Ok((pos, value)) => Ok((pos, value)),
-                            Err(..) => parse_suffixed(input, pos),
+                            Matched(pos, value) => Matched(pos, value),
+                            Failed => parse_suffixed(input, pos),
                         }
                     }
                 }
@@ -1515,7 +1472,7 @@ fn parse_prefixed(input: &str, pos: uint) -> Result<(uint, Expr), uint> {
         }
     }
 }
-fn parse_suffixed(input: &str, pos: uint) -> Result<(uint, Expr), uint> {
+fn parse_suffixed(input: &str, pos: uint) -> ParseResult<Expr> {
     {
         let choice_res =
             {
@@ -1523,121 +1480,119 @@ fn parse_suffixed(input: &str, pos: uint) -> Result<(uint, Expr), uint> {
                 {
                     let seq_res = parse_primary(input, pos);
                     match seq_res {
-                        Err(pos) => { Err(pos) }
-                        Ok((pos, expression)) => {
+                        Matched(pos, expression) => {
                             {
                                 let seq_res = parse_question(input, pos);
                                 match seq_res {
-                                    Err(pos) => { Err(pos) }
-                                    Ok((pos, _)) => {
+                                    Matched(pos, _) => {
                                         {
                                             let match_str =
                                                 input.slice(start_pos, pos);
-                                            Ok((pos,
-                                                OptionalExpr(box() expression)))
+                                            Matched(pos,
+                                                    OptionalExpr(box() expression))
                                         }
                                     }
+                                    Failed => Failed,
                                 }
                             }
                         }
+                        Failed => Failed,
                     }
                 }
             };
         match choice_res {
-            Ok((pos, value)) => Ok((pos, value)),
-            Err(..) => {
+            Matched(pos, value) => Matched(pos, value),
+            Failed => {
                 let choice_res =
                     {
                         let start_pos = pos;
                         {
                             let seq_res = parse_primary(input, pos);
                             match seq_res {
-                                Err(pos) => { Err(pos) }
-                                Ok((pos, expression)) => {
+                                Matched(pos, expression) => {
                                     {
                                         let seq_res =
                                             parse_starstar(input, pos);
                                         match seq_res {
-                                            Err(pos) => { Err(pos) }
-                                            Ok((pos, _)) => {
+                                            Matched(pos, _) => {
                                                 {
                                                     let seq_res =
                                                         parse_primary(input,
                                                                       pos);
                                                     match seq_res {
-                                                        Err(pos) => {
-                                                            Err(pos)
-                                                        }
-                                                        Ok((pos, sep)) => {
+                                                        Matched(pos, sep) => {
                                                             {
                                                                 let match_str =
                                                                     input.slice(start_pos,
                                                                                 pos);
-                                                                Ok((pos,
-                                                                    Repeat(box() expression,
-                                                                           0,
-                                                                           Some(box() sep))))
+                                                                Matched(pos,
+                                                                        Repeat(box() expression,
+                                                                               0,
+                                                                               Some(box() sep)))
                                                             }
                                                         }
+                                                        Failed => Failed,
                                                     }
                                                 }
                                             }
+                                            Failed => Failed,
                                         }
                                     }
                                 }
+                                Failed => Failed,
                             }
                         }
                     };
                 match choice_res {
-                    Ok((pos, value)) => Ok((pos, value)),
-                    Err(..) => {
+                    Matched(pos, value) => Matched(pos, value),
+                    Failed => {
                         let choice_res =
                             {
                                 let start_pos = pos;
                                 {
                                     let seq_res = parse_primary(input, pos);
                                     match seq_res {
-                                        Err(pos) => { Err(pos) }
-                                        Ok((pos, expression)) => {
+                                        Matched(pos, expression) => {
                                             {
                                                 let seq_res =
                                                     parse_plusplus(input,
                                                                    pos);
                                                 match seq_res {
-                                                    Err(pos) => { Err(pos) }
-                                                    Ok((pos, _)) => {
+                                                    Matched(pos, _) => {
                                                         {
                                                             let seq_res =
                                                                 parse_primary(input,
                                                                               pos);
                                                             match seq_res {
-                                                                Err(pos) => {
-                                                                    Err(pos)
-                                                                }
-                                                                Ok((pos, sep))
+                                                                Matched(pos,
+                                                                        sep)
                                                                 => {
                                                                     {
                                                                         let match_str =
                                                                             input.slice(start_pos,
                                                                                         pos);
-                                                                        Ok((pos,
-                                                                            Repeat(box() expression,
-                                                                                   1,
-                                                                                   Some(box() sep))))
+                                                                        Matched(pos,
+                                                                                Repeat(box() expression,
+                                                                                       1,
+                                                                                       Some(box() sep)))
                                                                     }
                                                                 }
+                                                                Failed =>
+                                                                Failed,
                                                             }
                                                         }
                                                     }
+                                                    Failed => Failed,
                                                 }
                                             }
                                         }
+                                        Failed => Failed,
                                     }
                                 }
                             };
                         match choice_res {
-                            Ok((pos, value)) => Ok((pos, value)),
-                            Err(..) => {
+                            Matched(pos, value) => Matched(pos, value),
+                            Failed => {
                                 let choice_res =
                                     {
                                         let start_pos = pos;
@@ -1645,36 +1600,36 @@ fn parse_suffixed(input: &str, pos: uint) -> Result<(uint, Expr), uint> {
                                             let seq_res =
                                                 parse_primary(input, pos);
                                             match seq_res {
-                                                Err(pos) => { Err(pos) }
-                                                Ok((pos, expression)) => {
+                                                Matched(pos, expression) => {
                                                     {
                                                         let seq_res =
                                                             parse_star(input,
                                                                        pos);
                                                         match seq_res {
-                                                            Err(pos) => {
-                                                                Err(pos)
-                                                            }
-                                                            Ok((pos, _)) => {
+                                                            Matched(pos, _) =>
+                                                            {
                                                                 {
                                                                     let match_str =
                                                                         input.slice(start_pos,
                                                                                     pos);
-                                                                    Ok((pos,
-                                                                        Repeat(box() expression,
-                                                                               0,
-                                                                               None)))
+                                                                    Matched(pos,
+                                                                            Repeat(box() expression,
+                                                                                   0,
+                                                                                   None))
                                                                 }
                                                             }
+                                                            Failed => Failed,
                                                         }
                                                     }
                                                 }
+                                                Failed => Failed,
                                             }
                                         }
                                     };
                                 match choice_res {
-                                    Ok((pos, value)) => Ok((pos, value)),
-                                    Err(..) => {
+                                    Matched(pos, value) =>
+                                    Matched(pos, value),
+                                    Failed => {
                                         let choice_res =
                                             {
                                                 let start_pos = pos;
@@ -1683,44 +1638,41 @@ fn parse_suffixed(input: &str, pos: uint) -> Result<(uint, Expr), uint> {
                                                         parse_primary(input,
                                                                       pos);
                                                     match seq_res {
-                                                        Err(pos) => {
-                                                            Err(pos)
-                                                        }
-                                                        Ok((pos, expression))
-                                                        => {
+                                                        Matched(pos,
+                                                                expression) =>
+                                                        {
                                                             {
                                                                 let seq_res =
                                                                     parse_plus(input,
                                                                                pos);
                                                                 match seq_res
                                                                     {
-                                                                    Err(pos)
+                                                                    Matched(pos,
+                                                                            _)
                                                                     => {
-                                                                        Err(pos)
-                                                                    }
-                                                                    Ok((pos,
-                                                                        _)) =>
-                                                                    {
                                                                         {
                                                                             let match_str =
                                                                                 input.slice(start_pos,
                                                                                             pos);
-                                                                            Ok((pos,
-                                                                                Repeat(box() expression,
-                                                                                       1,
-                                                                                       None)))
+                                                                            Matched(pos,
+                                                                                    Repeat(box() expression,
+                                                                                           1,
+                                                                                           None))
                                                                         }
                                                                     }
+                                                                    Failed =>
+                                                                    Failed,
                                                                 }
                                                             }
                                                         }
+                                                        Failed => Failed,
                                                     }
                                                 }
                                             };
                                         match choice_res {
-                                            Ok((pos, value)) =>
-                                            Ok((pos, value)),
-                                            Err(..) =>
+                                            Matched(pos, value) =>
+                                            Matched(pos, value),
+                                            Failed =>
                                             parse_primary(input, pos),
                                         }
                                     }
@@ -1733,7 +1685,7 @@ fn parse_suffixed(input: &str, pos: uint) -> Result<(uint, Expr), uint> {
         }
     }
 }
-fn parse_primary(input: &str, pos: uint) -> Result<(uint, Expr), uint> {
+fn parse_primary(input: &str, pos: uint) -> ParseResult<Expr> {
     {
         let choice_res =
             {
@@ -1741,8 +1693,7 @@ fn parse_primary(input: &str, pos: uint) -> Result<(uint, Expr), uint> {
                 {
                     let seq_res = parse_identifier(input, pos);
                     match seq_res {
-                        Err(pos) => { Err(pos) }
-                        Ok((pos, name)) => {
+                        Matched(pos, name) => {
                             {
                                 let seq_res =
                                     {
@@ -1751,67 +1702,68 @@ fn parse_primary(input: &str, pos: uint) -> Result<(uint, Expr), uint> {
                                                 let seq_res =
                                                     match parse_string(input,
                                                                        pos) {
-                                                        Ok((newpos, value)) =>
-                                                        {
-                                                            Ok((newpos,
-                                                                Some(value)))
+                                                        Matched(newpos, value)
+                                                        => {
+                                                            Matched(newpos,
+                                                                    Some(value))
                                                         }
-                                                        Err(..) => {
-                                                            Ok((pos, None))
+                                                        Failed => {
+                                                            Matched(pos, None)
                                                         }
                                                     };
                                                 match seq_res {
-                                                    Err(pos) => { Err(pos) }
-                                                    Ok((pos, _)) => {
+                                                    Matched(pos, _) => {
                                                         {
                                                             let seq_res =
                                                                 parse_returntype(input,
                                                                                  pos);
                                                             match seq_res {
-                                                                Err(pos) => {
-                                                                    Err(pos)
-                                                                }
-                                                                Ok((pos, _))
-                                                                => {
+                                                                Matched(pos,
+                                                                        _) =>
+                                                                {
                                                                     parse_equals(input,
                                                                                  pos)
                                                                 }
+                                                                Failed =>
+                                                                Failed,
                                                             }
                                                         }
                                                     }
+                                                    Failed => Failed,
                                                 }
                                             };
                                         match assert_res {
-                                            Err(..) => Ok((pos, ())),
-                                            Ok(..) => Err(pos),
+                                            Failed => Matched(pos, ()),
+                                            Matched(..) => Failed,
                                         }
                                     };
                                 match seq_res {
-                                    Err(pos) => { Err(pos) }
-                                    Ok((pos, _)) => {
+                                    Matched(pos, _) => {
                                         {
                                             let match_str =
                                                 input.slice(start_pos, pos);
-                                            Ok((pos, RuleExpr(name)))
+                                            Matched(pos, RuleExpr(name))
                                         }
                                     }
+                                    Failed => Failed,
                                 }
                             }
                         }
+                        Failed => Failed,
                     }
                 }
             };
         match choice_res {
-            Ok((pos, value)) => Ok((pos, value)),
-            Err(..) => {
+            Matched(pos, value) => Matched(pos, value),
+            Failed => {
                 let choice_res = parse_literal(input, pos);
                 match choice_res {
-                    Ok((pos, value)) => Ok((pos, value)),
-                    Err(..) => {
+                    Matched(pos, value) => Matched(pos, value),
+                    Failed => {
                         let choice_res = parse_class(input, pos);
                         match choice_res {
-                            Ok((pos, value)) => Ok((pos, value)),
-                            Err(..) => {
+                            Matched(pos, value) => Matched(pos, value),
+                            Failed => {
                                 let choice_res =
                                     {
                                         let start_pos = pos;
@@ -1819,38 +1771,36 @@ fn parse_primary(input: &str, pos: uint) -> Result<(uint, Expr), uint> {
                                             let seq_res =
                                                 parse_dot(input, pos);
                                             match seq_res {
-                                                Err(pos) => { Err(pos) }
-                                                Ok((pos, _)) => {
+                                                Matched(pos, _) => {
                                                     {
                                                         let match_str =
                                                             input.slice(start_pos,
                                                                         pos);
-                                                        Ok((pos, AnyCharExpr))
+                                                        Matched(pos,
+                                                                AnyCharExpr)
                                                     }
                                                 }
+                                                Failed => Failed,
                                             }
                                         }
                                     };
                                 match choice_res {
-                                    Ok((pos, value)) => Ok((pos, value)),
-                                    Err(..) => {
+                                    Matched(pos, value) =>
+                                    Matched(pos, value),
+                                    Failed => {
                                         let start_pos = pos;
                                         {
                                             let seq_res =
                                                 parse_lparen(input, pos);
                                             match seq_res {
-                                                Err(pos) => { Err(pos) }
-                                                Ok((pos, _)) => {
+                                                Matched(pos, _) => {
                                                     {
                                                         let seq_res =
                                                             parse_expression(input,
                                                                              pos);
                                                         match seq_res {
-                                                            Err(pos) => {
-                                                                Err(pos)
-                                                            }
-                                                            Ok((pos,
-                                                                expression))
+                                                            Matched(pos,
+                                                                    expression)
                                                             => {
                                                                 {
                                                                     let seq_res =
@@ -1858,27 +1808,28 @@ fn parse_primary(input: &str, pos: uint) -> Result<(uint, Expr), uint> {
                                                                                      pos);
                                                                     match seq_res
                                                                         {
-                                                                        Err(pos)
-                                                                        => {
-                                                                            Err(pos)
-                                                                        }
-                                                                        Ok((pos,
-                                                                            _))
+                                                                        Matched(pos,
+                                                                                _)
                                                                         => {
                                                                             {
                                                                                 let match_str =
                                                                                     input.slice(start_pos,
                                                                                                 pos);
-                                                                                Ok((pos,
-                                                                                    expression))
+                                                                                Matched(pos,
+                                                                                        expression)
                                                                             }
                                                                         }
+                                                                        Failed
+                                                                        =>
+                                                                        Failed,
                                                                     }
                                                                 }
                                                             }
+                                                            Failed => Failed,
                                                         }
                                                     }
                                                 }
+                                                Failed => Failed,
                                             }
                                         }
                                     }
@@ -1891,40 +1842,39 @@ fn parse_primary(input: &str, pos: uint) -> Result<(uint, Expr), uint> {
         }
     }
 }
-fn parse_action(input: &str, pos: uint) -> Result<(uint, String), uint> {
+fn parse_action(input: &str, pos: uint) -> ParseResult<String> {
     {
         let start_pos = pos;
         {
             let seq_res = parse_braced(input, pos);
             match seq_res {
-                Err(pos) => { Err(pos) }
-                Ok((pos, braced)) => {
+                Matched(pos, braced) => {
                     {
                         let seq_res = parse___(input, pos);
                         match seq_res {
-                            Err(pos) => { Err(pos) }
-                            Ok((pos, _)) => {
+                            Matched(pos, _) => {
                                 {
                                     let match_str =
                                         input.slice(start_pos, pos);
-                                    Ok((pos, braced))
+                                    Matched(pos, braced)
                                 }
                             }
+                            Failed => Failed,
                         }
                     }
                 }
+                Failed => Failed,
             }
         }
     }
 }
-fn parse_braced(input: &str, pos: uint) -> Result<(uint, String), uint> {
+fn parse_braced(input: &str, pos: uint) -> ParseResult<String> {
     {
         let start_pos = pos;
         {
             let seq_res = slice_eq(input, pos, "{");
             match seq_res {
-                Err(pos) => { Err(pos) }
-                Ok((pos, _)) => {
+                Matched(pos, _) => {
                     {
                         let seq_res =
                             {
@@ -1944,78 +1894,78 @@ fn parse_braced(input: &str, pos: uint) -> Result<(uint, String), uint> {
                                                                                  pos);
                                                                 match seq_res
                                                                     {
-                                                                    Err(pos)
+                                                                    Matched(pos,
+                                                                            _)
                                                                     => {
-                                                                        Err(pos)
-                                                                    }
-                                                                    Ok((pos,
-                                                                        _)) =>
-                                                                    {
                                                                         slice_eq(input,
                                                                                  pos,
                                                                                  "")
                                                                     }
+                                                                    Failed =>
+                                                                    Failed,
                                                                 }
                                                             };
                                                         match choice_res {
-                                                            Ok((pos, value))
-                                                            =>
-                                                            Ok((pos, value)),
-                                                            Err(..) =>
+                                                            Matched(pos,
+                                                                    value) =>
+                                                            Matched(pos,
+                                                                    value),
+                                                            Failed =>
                                                             parse_nonBraceCharacters(input,
                                                                                      pos),
                                                         }
                                                     };
                                                 match step_res {
-                                                    Ok((newpos, value)) => {
+                                                    Matched(newpos, value) =>
+                                                    {
                                                         repeat_pos = newpos;
                                                     }
-                                                    Err(..) => { break ; }
+                                                    Failed => { break ; }
                                                 }
                                             }
-                                            Ok((repeat_pos, ()))
+                                            Matched(repeat_pos, ())
                                         };
                                     match seq_res {
-                                        Err(pos) => { Err(pos) }
-                                        Ok((pos, _)) => {
+                                        Matched(pos, _) => {
                                             {
                                                 let match_str =
                                                     input.slice(start_pos,
                                                                 pos);
-                                                Ok((pos,
-                                                    match_str.to_string()))
+                                                Matched(pos,
+                                                        match_str.to_string())
                                             }
                                         }
+                                        Failed => Failed,
                                     }
                                 }
                             };
                         match seq_res {
-                            Err(pos) => { Err(pos) }
-                            Ok((pos, b)) => {
+                            Matched(pos, b) => {
                                 {
                                     let seq_res = slice_eq(input, pos, "}");
                                     match seq_res {
-                                        Err(pos) => { Err(pos) }
-                                        Ok((pos, _)) => {
+                                        Matched(pos, _) => {
                                             {
                                                 let match_str =
                                                     input.slice(start_pos,
                                                                 pos);
-                                                Ok((pos, b))
+                                                Matched(pos, b)
                                             }
                                         }
+                                        Failed => Failed,
                                     }
                                 }
                             }
+                            Failed => Failed,
                         }
                     }
                 }
+                Failed => Failed,
             }
         }
     }
 }
-fn parse_nonBraceCharacters(input: &str, pos: uint) ->
- Result<(uint, ()), uint> {
+fn parse_nonBraceCharacters(input: &str, pos: uint) -> ParseResult<()> {
     {
         let mut repeat_pos = pos;
         let mut repeat_value = vec!();
@@ -2023,171 +1973,170 @@ fn parse_nonBraceCharacters(input: &str, pos: uint) ->
             let pos = repeat_pos;
             let step_res = parse_nonBraceCharacter(input, pos);
             match step_res {
-                Ok((newpos, value)) => {
+                Matched(newpos, value) => {
                     repeat_pos = newpos;
                     repeat_value.push(value);
                 }
-                Err(..) => { break ; }
+                Failed => { break ; }
             }
         }
         if repeat_value.len() >= 1u {
-            Ok((repeat_pos, ()))
-        } else { Err(repeat_pos) }
+            Matched(repeat_pos, ())
+        } else { Failed }
     }
 }
-fn parse_nonBraceCharacter(input: &str, pos: uint) ->
- Result<(uint, ()), uint> {
+fn parse_nonBraceCharacter(input: &str, pos: uint) -> ParseResult<()> {
     if input.len() > pos {
         let ::std::str::CharRange { ch: ch, next: next } =
             input.char_range_at(pos);
-        match ch { '{' | '}' => Err(pos), _ => Ok((next, ())), }
-    } else { Err(pos) }
+        match ch { '{' | '}' => Failed, _ => Matched(next, ()), }
+    } else { Failed }
 }
-fn parse_equals(input: &str, pos: uint) -> Result<(uint, ()), uint> {
+fn parse_equals(input: &str, pos: uint) -> ParseResult<()> {
     {
         let seq_res = slice_eq(input, pos, "=");
         match seq_res {
-            Err(pos) => { Err(pos) }
-            Ok((pos, _)) => { parse___(input, pos) }
+            Matched(pos, _) => { parse___(input, pos) }
+            Failed => Failed,
         }
     }
 }
-fn parse_colon(input: &str, pos: uint) -> Result<(uint, ()), uint> {
+fn parse_colon(input: &str, pos: uint) -> ParseResult<()> {
     {
         let seq_res = slice_eq(input, pos, ":");
         match seq_res {
-            Err(pos) => { Err(pos) }
-            Ok((pos, _)) => { parse___(input, pos) }
+            Matched(pos, _) => { parse___(input, pos) }
+            Failed => Failed,
         }
     }
 }
-fn parse_semicolon(input: &str, pos: uint) -> Result<(uint, ()), uint> {
+fn parse_semicolon(input: &str, pos: uint) -> ParseResult<()> {
     {
         let seq_res = slice_eq(input, pos, ";");
         match seq_res {
-            Err(pos) => { Err(pos) }
-            Ok((pos, _)) => { parse___(input, pos) }
+            Matched(pos, _) => { parse___(input, pos) }
+            Failed => Failed,
         }
     }
 }
-fn parse_slash(input: &str, pos: uint) -> Result<(uint, ()), uint> {
+fn parse_slash(input: &str, pos: uint) -> ParseResult<()> {
     {
         let seq_res = slice_eq(input, pos, "/");
         match seq_res {
-            Err(pos) => { Err(pos) }
-            Ok((pos, _)) => { parse___(input, pos) }
+            Matched(pos, _) => { parse___(input, pos) }
+            Failed => Failed,
         }
     }
 }
-fn parse_and(input: &str, pos: uint) -> Result<(uint, ()), uint> {
+fn parse_and(input: &str, pos: uint) -> ParseResult<()> {
     {
         let seq_res = slice_eq(input, pos, "&");
         match seq_res {
-            Err(pos) => { Err(pos) }
-            Ok((pos, _)) => { parse___(input, pos) }
+            Matched(pos, _) => { parse___(input, pos) }
+            Failed => Failed,
         }
     }
 }
-fn parse_not(input: &str, pos: uint) -> Result<(uint, ()), uint> {
+fn parse_not(input: &str, pos: uint) -> ParseResult<()> {
     {
         let seq_res = slice_eq(input, pos, "!");
         match seq_res {
-            Err(pos) => { Err(pos) }
-            Ok((pos, _)) => { parse___(input, pos) }
+            Matched(pos, _) => { parse___(input, pos) }
+            Failed => Failed,
         }
     }
 }
-fn parse_dollar(input: &str, pos: uint) -> Result<(uint, ()), uint> {
+fn parse_dollar(input: &str, pos: uint) -> ParseResult<()> {
     {
         let seq_res = slice_eq(input, pos, "$");
         match seq_res {
-            Err(pos) => { Err(pos) }
-            Ok((pos, _)) => { parse___(input, pos) }
+            Matched(pos, _) => { parse___(input, pos) }
+            Failed => Failed,
         }
     }
 }
-fn parse_question(input: &str, pos: uint) -> Result<(uint, ()), uint> {
+fn parse_question(input: &str, pos: uint) -> ParseResult<()> {
     {
         let seq_res = slice_eq(input, pos, "?");
         match seq_res {
-            Err(pos) => { Err(pos) }
-            Ok((pos, _)) => { parse___(input, pos) }
+            Matched(pos, _) => { parse___(input, pos) }
+            Failed => Failed,
         }
     }
 }
-fn parse_star(input: &str, pos: uint) -> Result<(uint, ()), uint> {
+fn parse_star(input: &str, pos: uint) -> ParseResult<()> {
     {
         let seq_res = slice_eq(input, pos, "*");
         match seq_res {
-            Err(pos) => { Err(pos) }
-            Ok((pos, _)) => { parse___(input, pos) }
+            Matched(pos, _) => { parse___(input, pos) }
+            Failed => Failed,
         }
     }
 }
-fn parse_starstar(input: &str, pos: uint) -> Result<(uint, ()), uint> {
+fn parse_starstar(input: &str, pos: uint) -> ParseResult<()> {
     {
         let seq_res = slice_eq(input, pos, "**");
         match seq_res {
-            Err(pos) => { Err(pos) }
-            Ok((pos, _)) => { parse___(input, pos) }
+            Matched(pos, _) => { parse___(input, pos) }
+            Failed => Failed,
         }
     }
 }
-fn parse_plus(input: &str, pos: uint) -> Result<(uint, ()), uint> {
+fn parse_plus(input: &str, pos: uint) -> ParseResult<()> {
     {
         let seq_res = slice_eq(input, pos, "+");
         match seq_res {
-            Err(pos) => { Err(pos) }
-            Ok((pos, _)) => { parse___(input, pos) }
+            Matched(pos, _) => { parse___(input, pos) }
+            Failed => Failed,
         }
     }
 }
-fn parse_plusplus(input: &str, pos: uint) -> Result<(uint, ()), uint> {
+fn parse_plusplus(input: &str, pos: uint) -> ParseResult<()> {
     {
         let seq_res = slice_eq(input, pos, "++");
         match seq_res {
-            Err(pos) => { Err(pos) }
-            Ok((pos, _)) => { parse___(input, pos) }
+            Matched(pos, _) => { parse___(input, pos) }
+            Failed => Failed,
         }
     }
 }
-fn parse_lparen(input: &str, pos: uint) -> Result<(uint, ()), uint> {
+fn parse_lparen(input: &str, pos: uint) -> ParseResult<()> {
     {
         let seq_res = slice_eq(input, pos, "(");
         match seq_res {
-            Err(pos) => { Err(pos) }
-            Ok((pos, _)) => { parse___(input, pos) }
+            Matched(pos, _) => { parse___(input, pos) }
+            Failed => Failed,
         }
     }
 }
-fn parse_rparen(input: &str, pos: uint) -> Result<(uint, ()), uint> {
+fn parse_rparen(input: &str, pos: uint) -> ParseResult<()> {
     {
         let seq_res = slice_eq(input, pos, ")");
         match seq_res {
-            Err(pos) => { Err(pos) }
-            Ok((pos, _)) => { parse___(input, pos) }
+            Matched(pos, _) => { parse___(input, pos) }
+            Failed => Failed,
         }
     }
 }
-fn parse_dot(input: &str, pos: uint) -> Result<(uint, ()), uint> {
+fn parse_dot(input: &str, pos: uint) -> ParseResult<()> {
     {
         let seq_res = slice_eq(input, pos, ".");
         match seq_res {
-            Err(pos) => { Err(pos) }
-            Ok((pos, _)) => { parse___(input, pos) }
+            Matched(pos, _) => { parse___(input, pos) }
+            Failed => Failed,
         }
     }
 }
-fn parse_returns(input: &str, pos: uint) -> Result<(uint, ()), uint> {
+fn parse_returns(input: &str, pos: uint) -> ParseResult<()> {
     {
         let seq_res = slice_eq(input, pos, "->");
         match seq_res {
-            Err(pos) => { Err(pos) }
-            Ok((pos, _)) => { parse___(input, pos) }
+            Matched(pos, _) => { parse___(input, pos) }
+            Failed => Failed,
         }
     }
 }
-fn parse_identifier(input: &str, pos: uint) -> Result<(uint, String), uint> {
+fn parse_identifier(input: &str, pos: uint) -> ParseResult<String> {
     {
         let start_pos = pos;
         {
@@ -2199,13 +2148,13 @@ fn parse_identifier(input: &str, pos: uint) -> Result<(uint, String), uint> {
                             {
                                 let choice_res = parse_letter(input, pos);
                                 match choice_res {
-                                    Ok((pos, value)) => Ok((pos, value)),
-                                    Err(..) => slice_eq(input, pos, "_"),
+                                    Matched(pos, value) =>
+                                    Matched(pos, value),
+                                    Failed => slice_eq(input, pos, "_"),
                                 }
                             };
                         match seq_res {
-                            Err(pos) => { Err(pos) }
-                            Ok((pos, _)) => {
+                            Matched(pos, _) => {
                                 {
                                     let seq_res =
                                         {
@@ -2218,21 +2167,22 @@ fn parse_identifier(input: &str, pos: uint) -> Result<(uint, String), uint> {
                                                             parse_letter(input,
                                                                          pos);
                                                         match choice_res {
-                                                            Ok((pos, value))
-                                                            =>
-                                                            Ok((pos, value)),
-                                                            Err(..) => {
+                                                            Matched(pos,
+                                                                    value) =>
+                                                            Matched(pos,
+                                                                    value),
+                                                            Failed => {
                                                                 let choice_res =
                                                                     parse_digit(input,
                                                                                 pos);
                                                                 match choice_res
                                                                     {
-                                                                    Ok((pos,
-                                                                        value))
+                                                                    Matched(pos,
+                                                                            value)
                                                                     =>
-                                                                    Ok((pos,
-                                                                        value)),
-                                                                    Err(..) =>
+                                                                    Matched(pos,
+                                                                            value),
+                                                                    Failed =>
                                                                     slice_eq(input,
                                                                              pos,
                                                                              "_"),
@@ -2241,53 +2191,55 @@ fn parse_identifier(input: &str, pos: uint) -> Result<(uint, String), uint> {
                                                         }
                                                     };
                                                 match step_res {
-                                                    Ok((newpos, value)) => {
+                                                    Matched(newpos, value) =>
+                                                    {
                                                         repeat_pos = newpos;
                                                     }
-                                                    Err(..) => { break ; }
+                                                    Failed => { break ; }
                                                 }
                                             }
-                                            Ok((repeat_pos, ()))
+                                            Matched(repeat_pos, ())
                                         };
                                     match seq_res {
-                                        Err(pos) => { Err(pos) }
-                                        Ok((pos, _)) => {
+                                        Matched(pos, _) => {
                                             {
                                                 let match_str =
                                                     input.slice(start_pos,
                                                                 pos);
-                                                Ok((pos,
-                                                    match_str.to_string()))
+                                                Matched(pos,
+                                                        match_str.to_string())
                                             }
                                         }
+                                        Failed => Failed,
                                     }
                                 }
                             }
+                            Failed => Failed,
                         }
                     }
                 };
             match seq_res {
-                Err(pos) => { Err(pos) }
-                Ok((pos, chars)) => {
+                Matched(pos, chars) => {
                     {
                         let seq_res = parse___(input, pos);
                         match seq_res {
-                            Err(pos) => { Err(pos) }
-                            Ok((pos, _)) => {
+                            Matched(pos, _) => {
                                 {
                                     let match_str =
                                         input.slice(start_pos, pos);
-                                    Ok((pos, chars))
+                                    Matched(pos, chars)
                                 }
                             }
+                            Failed => Failed,
                         }
                     }
                 }
+                Failed => Failed,
             }
         }
     }
 }
-fn parse_literal(input: &str, pos: uint) -> Result<(uint, Expr), uint> {
+fn parse_literal(input: &str, pos: uint) -> ParseResult<Expr> {
     {
         let start_pos = pos;
         {
@@ -2295,47 +2247,48 @@ fn parse_literal(input: &str, pos: uint) -> Result<(uint, Expr), uint> {
                 {
                     let choice_res = parse_doubleQuotedString(input, pos);
                     match choice_res {
-                        Ok((pos, value)) => Ok((pos, value)),
-                        Err(..) => parse_singleQuotedString(input, pos),
+                        Matched(pos, value) => Matched(pos, value),
+                        Failed => parse_singleQuotedString(input, pos),
                     }
                 };
             match seq_res {
-                Err(pos) => { Err(pos) }
-                Ok((pos, value)) => {
+                Matched(pos, value) => {
                     {
                         let seq_res =
                             match slice_eq(input, pos, "i") {
-                                Ok((newpos, value)) => {
-                                    Ok((newpos, Some(value)))
+                                Matched(newpos, value) => {
+                                    Matched(newpos, Some(value))
                                 }
-                                Err(..) => { Ok((pos, None)) }
+                                Failed => { Matched(pos, None) }
                             };
                         match seq_res {
-                            Err(pos) => { Err(pos) }
-                            Ok((pos, flags)) => {
+                            Matched(pos, flags) => {
                                 {
                                     let seq_res = parse___(input, pos);
                                     match seq_res {
-                                        Err(pos) => { Err(pos) }
-                                        Ok((pos, _)) => {
+                                        Matched(pos, _) => {
                                             {
                                                 let match_str =
                                                     input.slice(start_pos,
                                                                 pos);
-                                                Ok((pos, LiteralExpr(value)))
+                                                Matched(pos,
+                                                        LiteralExpr(value))
                                             }
                                         }
+                                        Failed => Failed,
                                     }
                                 }
                             }
+                            Failed => Failed,
                         }
                     }
                 }
+                Failed => Failed,
             }
         }
     }
 }
-fn parse_string(input: &str, pos: uint) -> Result<(uint, String), uint> {
+fn parse_string(input: &str, pos: uint) -> ParseResult<String> {
     {
         let start_pos = pos;
         {
@@ -2343,40 +2296,38 @@ fn parse_string(input: &str, pos: uint) -> Result<(uint, String), uint> {
                 {
                     let choice_res = parse_doubleQuotedString(input, pos);
                     match choice_res {
-                        Ok((pos, value)) => Ok((pos, value)),
-                        Err(..) => parse_singleQuotedString(input, pos),
+                        Matched(pos, value) => Matched(pos, value),
+                        Failed => parse_singleQuotedString(input, pos),
                     }
                 };
             match seq_res {
-                Err(pos) => { Err(pos) }
-                Ok((pos, string)) => {
+                Matched(pos, string) => {
                     {
                         let seq_res = parse___(input, pos);
                         match seq_res {
-                            Err(pos) => { Err(pos) }
-                            Ok((pos, _)) => {
+                            Matched(pos, _) => {
                                 {
                                     let match_str =
                                         input.slice(start_pos, pos);
-                                    Ok((pos, string))
+                                    Matched(pos, string)
                                 }
                             }
+                            Failed => Failed,
                         }
                     }
                 }
+                Failed => Failed,
             }
         }
     }
 }
-fn parse_doubleQuotedString(input: &str, pos: uint) ->
- Result<(uint, String), uint> {
+fn parse_doubleQuotedString(input: &str, pos: uint) -> ParseResult<String> {
     {
         let start_pos = pos;
         {
             let seq_res = slice_eq(input, pos, "\"");
             match seq_res {
-                Err(pos) => { Err(pos) }
-                Ok((pos, _)) => {
+                Matched(pos, _) => {
                     {
                         let seq_res =
                             {
@@ -2388,68 +2339,69 @@ fn parse_doubleQuotedString(input: &str, pos: uint) ->
                                         parse_doubleQuotedCharacter(input,
                                                                     pos);
                                     match step_res {
-                                        Ok((newpos, value)) => {
+                                        Matched(newpos, value) => {
                                             repeat_pos = newpos;
                                             repeat_value.push(value);
                                         }
-                                        Err(..) => { break ; }
+                                        Failed => { break ; }
                                     }
                                 }
-                                Ok((repeat_pos, repeat_value))
+                                Matched(repeat_pos, repeat_value)
                             };
                         match seq_res {
-                            Err(pos) => { Err(pos) }
-                            Ok((pos, s)) => {
+                            Matched(pos, s) => {
                                 {
                                     let seq_res = slice_eq(input, pos, "\"");
                                     match seq_res {
-                                        Err(pos) => { Err(pos) }
-                                        Ok((pos, _)) => {
+                                        Matched(pos, _) => {
                                             {
                                                 let match_str =
                                                     input.slice(start_pos,
                                                                 pos);
-                                                Ok((pos,
-                                                    String::from_chars(s.as_slice())))
+                                                Matched(pos,
+                                                        String::from_chars(s.as_slice()))
                                             }
                                         }
+                                        Failed => Failed,
                                     }
                                 }
                             }
+                            Failed => Failed,
                         }
                     }
                 }
+                Failed => Failed,
             }
         }
     }
 }
-fn parse_doubleQuotedCharacter(input: &str, pos: uint) ->
- Result<(uint, char), uint> {
+fn parse_doubleQuotedCharacter(input: &str, pos: uint) -> ParseResult<char> {
     {
         let choice_res = parse_simpleDoubleQuotedCharacter(input, pos);
         match choice_res {
-            Ok((pos, value)) => Ok((pos, value)),
-            Err(..) => {
+            Matched(pos, value) => Matched(pos, value),
+            Failed => {
                 let choice_res = parse_simpleEscapeSequence(input, pos);
                 match choice_res {
-                    Ok((pos, value)) => Ok((pos, value)),
-                    Err(..) => {
+                    Matched(pos, value) => Matched(pos, value),
+                    Failed => {
                         let choice_res = parse_zeroEscapeSequence(input, pos);
                         match choice_res {
-                            Ok((pos, value)) => Ok((pos, value)),
-                            Err(..) => {
+                            Matched(pos, value) => Matched(pos, value),
+                            Failed => {
                                 let choice_res =
                                     parse_hexEscapeSequence(input, pos);
                                 match choice_res {
-                                    Ok((pos, value)) => Ok((pos, value)),
-                                    Err(..) => {
+                                    Matched(pos, value) =>
+                                    Matched(pos, value),
+                                    Failed => {
                                         let choice_res =
                                             parse_unicodeEscapeSequence(input,
                                                                         pos);
                                         match choice_res {
-                                            Ok((pos, value)) =>
-                                            Ok((pos, value)),
-                                            Err(..) =>
+                                            Matched(pos, value) =>
+                                            Matched(pos, value),
+                                            Failed =>
                                             parse_eolEscapeSequence(input,
                                                                     pos),
                                         }
@@ -2464,7 +2416,7 @@ fn parse_doubleQuotedCharacter(input: &str, pos: uint) ->
     }
 }
 fn parse_simpleDoubleQuotedCharacter(input: &str, pos: uint) ->
- Result<(uint, char), uint> {
+ ParseResult<char> {
     {
         let start_pos = pos;
         {
@@ -2474,52 +2426,51 @@ fn parse_simpleDoubleQuotedCharacter(input: &str, pos: uint) ->
                         {
                             let choice_res = slice_eq(input, pos, "\"");
                             match choice_res {
-                                Ok((pos, value)) => Ok((pos, value)),
-                                Err(..) => {
+                                Matched(pos, value) => Matched(pos, value),
+                                Failed => {
                                     let choice_res =
                                         slice_eq(input, pos, "\\");
                                     match choice_res {
-                                        Ok((pos, value)) => Ok((pos, value)),
-                                        Err(..) => parse_eolChar(input, pos),
+                                        Matched(pos, value) =>
+                                        Matched(pos, value),
+                                        Failed => parse_eolChar(input, pos),
                                     }
                                 }
                             }
                         };
                     match assert_res {
-                        Err(..) => Ok((pos, ())),
-                        Ok(..) => Err(pos),
+                        Failed => Matched(pos, ()),
+                        Matched(..) => Failed,
                     }
                 };
             match seq_res {
-                Err(pos) => { Err(pos) }
-                Ok((pos, _)) => {
+                Matched(pos, _) => {
                     {
                         let seq_res = any_char(input, pos);
                         match seq_res {
-                            Err(pos) => { Err(pos) }
-                            Ok((pos, _)) => {
+                            Matched(pos, _) => {
                                 {
                                     let match_str =
                                         input.slice(start_pos, pos);
-                                    Ok((pos, match_str.char_at(0)))
+                                    Matched(pos, match_str.char_at(0))
                                 }
                             }
+                            Failed => Failed,
                         }
                     }
                 }
+                Failed => Failed,
             }
         }
     }
 }
-fn parse_singleQuotedString(input: &str, pos: uint) ->
- Result<(uint, String), uint> {
+fn parse_singleQuotedString(input: &str, pos: uint) -> ParseResult<String> {
     {
         let start_pos = pos;
         {
             let seq_res = slice_eq(input, pos, "\'");
             match seq_res {
-                Err(pos) => { Err(pos) }
-                Ok((pos, _)) => {
+                Matched(pos, _) => {
                     {
                         let seq_res =
                             {
@@ -2531,68 +2482,69 @@ fn parse_singleQuotedString(input: &str, pos: uint) ->
                                         parse_singleQuotedCharacter(input,
                                                                     pos);
                                     match step_res {
-                                        Ok((newpos, value)) => {
+                                        Matched(newpos, value) => {
                                             repeat_pos = newpos;
                                             repeat_value.push(value);
                                         }
-                                        Err(..) => { break ; }
+                                        Failed => { break ; }
                                     }
                                 }
-                                Ok((repeat_pos, repeat_value))
+                                Matched(repeat_pos, repeat_value)
                             };
                         match seq_res {
-                            Err(pos) => { Err(pos) }
-                            Ok((pos, s)) => {
+                            Matched(pos, s) => {
                                 {
                                     let seq_res = slice_eq(input, pos, "\'");
                                     match seq_res {
-                                        Err(pos) => { Err(pos) }
-                                        Ok((pos, _)) => {
+                                        Matched(pos, _) => {
                                             {
                                                 let match_str =
                                                     input.slice(start_pos,
                                                                 pos);
-                                                Ok((pos,
-                                                    String::from_chars(s.as_slice())))
+                                                Matched(pos,
+                                                        String::from_chars(s.as_slice()))
                                             }
                                         }
+                                        Failed => Failed,
                                     }
                                 }
                             }
+                            Failed => Failed,
                         }
                     }
                 }
+                Failed => Failed,
             }
         }
     }
 }
-fn parse_singleQuotedCharacter(input: &str, pos: uint) ->
- Result<(uint, char), uint> {
+fn parse_singleQuotedCharacter(input: &str, pos: uint) -> ParseResult<char> {
     {
         let choice_res = parse_simpleSingleQuotedCharacter(input, pos);
         match choice_res {
-            Ok((pos, value)) => Ok((pos, value)),
-            Err(..) => {
+            Matched(pos, value) => Matched(pos, value),
+            Failed => {
                 let choice_res = parse_simpleEscapeSequence(input, pos);
                 match choice_res {
-                    Ok((pos, value)) => Ok((pos, value)),
-                    Err(..) => {
+                    Matched(pos, value) => Matched(pos, value),
+                    Failed => {
                         let choice_res = parse_zeroEscapeSequence(input, pos);
                         match choice_res {
-                            Ok((pos, value)) => Ok((pos, value)),
-                            Err(..) => {
+                            Matched(pos, value) => Matched(pos, value),
+                            Failed => {
                                 let choice_res =
                                     parse_hexEscapeSequence(input, pos);
                                 match choice_res {
-                                    Ok((pos, value)) => Ok((pos, value)),
-                                    Err(..) => {
+                                    Matched(pos, value) =>
+                                    Matched(pos, value),
+                                    Failed => {
                                         let choice_res =
                                             parse_unicodeEscapeSequence(input,
                                                                         pos);
                                         match choice_res {
-                                            Ok((pos, value)) =>
-                                            Ok((pos, value)),
-                                            Err(..) =>
+                                            Matched(pos, value) =>
+                                            Matched(pos, value),
+                                            Failed =>
                                             parse_eolEscapeSequence(input,
                                                                     pos),
                                         }
@@ -2607,7 +2559,7 @@ fn parse_singleQuotedCharacter(input: &str, pos: uint) ->
     }
 }
 fn parse_simpleSingleQuotedCharacter(input: &str, pos: uint) ->
- Result<(uint, char), uint> {
+ ParseResult<char> {
     {
         let start_pos = pos;
         {
@@ -2617,62 +2569,61 @@ fn parse_simpleSingleQuotedCharacter(input: &str, pos: uint) ->
                         {
                             let choice_res = slice_eq(input, pos, "\'");
                             match choice_res {
-                                Ok((pos, value)) => Ok((pos, value)),
-                                Err(..) => {
+                                Matched(pos, value) => Matched(pos, value),
+                                Failed => {
                                     let choice_res =
                                         slice_eq(input, pos, "\\");
                                     match choice_res {
-                                        Ok((pos, value)) => Ok((pos, value)),
-                                        Err(..) => parse_eolChar(input, pos),
+                                        Matched(pos, value) =>
+                                        Matched(pos, value),
+                                        Failed => parse_eolChar(input, pos),
                                     }
                                 }
                             }
                         };
                     match assert_res {
-                        Err(..) => Ok((pos, ())),
-                        Ok(..) => Err(pos),
+                        Failed => Matched(pos, ()),
+                        Matched(..) => Failed,
                     }
                 };
             match seq_res {
-                Err(pos) => { Err(pos) }
-                Ok((pos, _)) => {
+                Matched(pos, _) => {
                     {
                         let seq_res = any_char(input, pos);
                         match seq_res {
-                            Err(pos) => { Err(pos) }
-                            Ok((pos, _)) => {
+                            Matched(pos, _) => {
                                 {
                                     let match_str =
                                         input.slice(start_pos, pos);
-                                    Ok((pos, match_str.char_at(0)))
+                                    Matched(pos, match_str.char_at(0))
                                 }
                             }
+                            Failed => Failed,
                         }
                     }
                 }
+                Failed => Failed,
             }
         }
     }
 }
-fn parse_class(input: &str, pos: uint) -> Result<(uint, Expr), uint> {
+fn parse_class(input: &str, pos: uint) -> ParseResult<Expr> {
     {
         let start_pos = pos;
         {
             let seq_res = slice_eq(input, pos, "[");
             match seq_res {
-                Err(pos) => { Err(pos) }
-                Ok((pos, _)) => {
+                Matched(pos, _) => {
                     {
                         let seq_res =
                             match slice_eq(input, pos, "^") {
-                                Ok((newpos, value)) => {
-                                    Ok((newpos, Some(value)))
+                                Matched(newpos, value) => {
+                                    Matched(newpos, Some(value))
                                 }
-                                Err(..) => { Ok((pos, None)) }
+                                Failed => { Matched(pos, None) }
                             };
                         match seq_res {
-                            Err(pos) => { Err(pos) }
-                            Ok((pos, inverted)) => {
+                            Matched(pos, inverted) => {
                                 {
                                     let seq_res =
                                         {
@@ -2686,186 +2637,189 @@ fn parse_class(input: &str, pos: uint) -> Result<(uint, Expr), uint> {
                                                             parse_classCharacterRange(input,
                                                                                       pos);
                                                         match choice_res {
-                                                            Ok((pos, value))
-                                                            =>
-                                                            Ok((pos, value)),
-                                                            Err(..) =>
+                                                            Matched(pos,
+                                                                    value) =>
+                                                            Matched(pos,
+                                                                    value),
+                                                            Failed =>
                                                             parse_classCharacter(input,
                                                                                  pos),
                                                         }
                                                     };
                                                 match step_res {
-                                                    Ok((newpos, value)) => {
+                                                    Matched(newpos, value) =>
+                                                    {
                                                         repeat_pos = newpos;
                                                         repeat_value.push(value);
                                                     }
-                                                    Err(..) => { break ; }
+                                                    Failed => { break ; }
                                                 }
                                             }
-                                            Ok((repeat_pos, repeat_value))
+                                            Matched(repeat_pos, repeat_value)
                                         };
                                     match seq_res {
-                                        Err(pos) => { Err(pos) }
-                                        Ok((pos, parts)) => {
+                                        Matched(pos, parts) => {
                                             {
                                                 let seq_res =
                                                     slice_eq(input, pos, "]");
                                                 match seq_res {
-                                                    Err(pos) => { Err(pos) }
-                                                    Ok((pos, _)) => {
+                                                    Matched(pos, _) => {
                                                         {
                                                             let seq_res =
                                                                 match slice_eq(input,
                                                                                pos,
                                                                                "i")
                                                                     {
-                                                                    Ok((newpos,
-                                                                        value))
+                                                                    Matched(newpos,
+                                                                            value)
                                                                     => {
-                                                                        Ok((newpos,
-                                                                            Some(value)))
+                                                                        Matched(newpos,
+                                                                                Some(value))
                                                                     }
-                                                                    Err(..) =>
+                                                                    Failed =>
                                                                     {
-                                                                        Ok((pos,
-                                                                            None))
+                                                                        Matched(pos,
+                                                                                None)
                                                                     }
                                                                 };
                                                             match seq_res {
-                                                                Err(pos) => {
-                                                                    Err(pos)
-                                                                }
-                                                                Ok((pos,
-                                                                    flags)) =>
-                                                                {
+                                                                Matched(pos,
+                                                                        flags)
+                                                                => {
                                                                     {
                                                                         let seq_res =
                                                                             parse___(input,
                                                                                      pos);
                                                                         match seq_res
                                                                             {
-                                                                            Err(pos)
-                                                                            =>
-                                                                            {
-                                                                                Err(pos)
-                                                                            }
-                                                                            Ok((pos,
-                                                                                _))
+                                                                            Matched(pos,
+                                                                                    _)
                                                                             =>
                                                                             {
                                                                                 {
                                                                                     let match_str =
                                                                                         input.slice(start_pos,
                                                                                                     pos);
-                                                                                    Ok((pos,
-                                                                                        CharSetExpr(inverted.is_some(),
-                                                                                                    parts)))
+                                                                                    Matched(pos,
+                                                                                            CharSetExpr(inverted.is_some(),
+                                                                                                        parts))
                                                                                 }
                                                                             }
+                                                                            Failed
+                                                                            =>
+                                                                            Failed,
                                                                         }
                                                                     }
                                                                 }
+                                                                Failed =>
+                                                                Failed,
                                                             }
                                                         }
                                                     }
+                                                    Failed => Failed,
                                                 }
                                             }
                                         }
+                                        Failed => Failed,
                                     }
                                 }
                             }
+                            Failed => Failed,
                         }
                     }
                 }
+                Failed => Failed,
             }
         }
     }
 }
 fn parse_classCharacterRange(input: &str, pos: uint) ->
- Result<(uint, CharSetCase), uint> {
+ ParseResult<CharSetCase> {
     {
         let start_pos = pos;
         {
             let seq_res = parse_bracketDelimitedCharacter(input, pos);
             match seq_res {
-                Err(pos) => { Err(pos) }
-                Ok((pos, begin)) => {
+                Matched(pos, begin) => {
                     {
                         let seq_res = slice_eq(input, pos, "-");
                         match seq_res {
-                            Err(pos) => { Err(pos) }
-                            Ok((pos, _)) => {
+                            Matched(pos, _) => {
                                 {
                                     let seq_res =
                                         parse_bracketDelimitedCharacter(input,
                                                                         pos);
                                     match seq_res {
-                                        Err(pos) => { Err(pos) }
-                                        Ok((pos, end)) => {
+                                        Matched(pos, end) => {
                                             {
                                                 let match_str =
                                                     input.slice(start_pos,
                                                                 pos);
-                                                Ok((pos,
-                                                    CharSetCase{start: begin,
-                                                                end: end,}))
+                                                Matched(pos,
+                                                        CharSetCase{start:
+                                                                        begin,
+                                                                    end:
+                                                                        end,})
                                             }
                                         }
+                                        Failed => Failed,
                                     }
                                 }
                             }
+                            Failed => Failed,
                         }
                     }
                 }
+                Failed => Failed,
             }
         }
     }
 }
-fn parse_classCharacter(input: &str, pos: uint) ->
- Result<(uint, CharSetCase), uint> {
+fn parse_classCharacter(input: &str, pos: uint) -> ParseResult<CharSetCase> {
     {
         let start_pos = pos;
         {
             let seq_res = parse_bracketDelimitedCharacter(input, pos);
             match seq_res {
-                Err(pos) => { Err(pos) }
-                Ok((pos, char_)) => {
+                Matched(pos, char_) => {
                     {
                         let match_str = input.slice(start_pos, pos);
-                        Ok((pos, CharSetCase{start: char_, end: char_,}))
+                        Matched(pos, CharSetCase{start: char_, end: char_,})
                     }
                 }
+                Failed => Failed,
             }
         }
     }
 }
 fn parse_bracketDelimitedCharacter(input: &str, pos: uint) ->
- Result<(uint, char), uint> {
+ ParseResult<char> {
     {
         let choice_res = parse_simpleBracketDelimitedCharacter(input, pos);
         match choice_res {
-            Ok((pos, value)) => Ok((pos, value)),
-            Err(..) => {
+            Matched(pos, value) => Matched(pos, value),
+            Failed => {
                 let choice_res = parse_simpleEscapeSequence(input, pos);
                 match choice_res {
-                    Ok((pos, value)) => Ok((pos, value)),
-                    Err(..) => {
+                    Matched(pos, value) => Matched(pos, value),
+                    Failed => {
                         let choice_res = parse_zeroEscapeSequence(input, pos);
                         match choice_res {
-                            Ok((pos, value)) => Ok((pos, value)),
-                            Err(..) => {
+                            Matched(pos, value) => Matched(pos, value),
+                            Failed => {
                                 let choice_res =
                                     parse_hexEscapeSequence(input, pos);
                                 match choice_res {
-                                    Ok((pos, value)) => Ok((pos, value)),
-                                    Err(..) => {
+                                    Matched(pos, value) =>
+                                    Matched(pos, value),
+                                    Failed => {
                                         let choice_res =
                                             parse_unicodeEscapeSequence(input,
                                                                         pos);
                                         match choice_res {
-                                            Ok((pos, value)) =>
-                                            Ok((pos, value)),
-                                            Err(..) =>
+                                            Matched(pos, value) =>
+                                            Matched(pos, value),
+                                            Failed =>
                                             parse_eolEscapeSequence(input,
                                                                     pos),
                                         }
@@ -2880,7 +2834,7 @@ fn parse_bracketDelimitedCharacter(input: &str, pos: uint) ->
     }
 }
 fn parse_simpleBracketDelimitedCharacter(input: &str, pos: uint) ->
- Result<(uint, char), uint> {
+ ParseResult<char> {
     {
         let start_pos = pos;
         {
@@ -2890,52 +2844,51 @@ fn parse_simpleBracketDelimitedCharacter(input: &str, pos: uint) ->
                         {
                             let choice_res = slice_eq(input, pos, "]");
                             match choice_res {
-                                Ok((pos, value)) => Ok((pos, value)),
-                                Err(..) => {
+                                Matched(pos, value) => Matched(pos, value),
+                                Failed => {
                                     let choice_res =
                                         slice_eq(input, pos, "\\");
                                     match choice_res {
-                                        Ok((pos, value)) => Ok((pos, value)),
-                                        Err(..) => parse_eolChar(input, pos),
+                                        Matched(pos, value) =>
+                                        Matched(pos, value),
+                                        Failed => parse_eolChar(input, pos),
                                     }
                                 }
                             }
                         };
                     match assert_res {
-                        Err(..) => Ok((pos, ())),
-                        Ok(..) => Err(pos),
+                        Failed => Matched(pos, ()),
+                        Matched(..) => Failed,
                     }
                 };
             match seq_res {
-                Err(pos) => { Err(pos) }
-                Ok((pos, _)) => {
+                Matched(pos, _) => {
                     {
                         let seq_res = any_char(input, pos);
                         match seq_res {
-                            Err(pos) => { Err(pos) }
-                            Ok((pos, _)) => {
+                            Matched(pos, _) => {
                                 {
                                     let match_str =
                                         input.slice(start_pos, pos);
-                                    Ok((pos, match_str.char_at(0)))
+                                    Matched(pos, match_str.char_at(0))
                                 }
                             }
+                            Failed => Failed,
                         }
                     }
                 }
+                Failed => Failed,
             }
         }
     }
 }
-fn parse_simpleEscapeSequence(input: &str, pos: uint) ->
- Result<(uint, char), uint> {
+fn parse_simpleEscapeSequence(input: &str, pos: uint) -> ParseResult<char> {
     {
         let start_pos = pos;
         {
             let seq_res = slice_eq(input, pos, "\\");
             match seq_res {
-                Err(pos) => { Err(pos) }
-                Ok((pos, _)) => {
+                Matched(pos, _) => {
                     {
                         let seq_res =
                             {
@@ -2944,24 +2897,25 @@ fn parse_simpleEscapeSequence(input: &str, pos: uint) ->
                                         let choice_res =
                                             parse_digit(input, pos);
                                         match choice_res {
-                                            Ok((pos, value)) =>
-                                            Ok((pos, value)),
-                                            Err(..) => {
+                                            Matched(pos, value) =>
+                                            Matched(pos, value),
+                                            Failed => {
                                                 let choice_res =
                                                     slice_eq(input, pos, "x");
                                                 match choice_res {
-                                                    Ok((pos, value)) =>
-                                                    Ok((pos, value)),
-                                                    Err(..) => {
+                                                    Matched(pos, value) =>
+                                                    Matched(pos, value),
+                                                    Failed => {
                                                         let choice_res =
                                                             slice_eq(input,
                                                                      pos,
                                                                      "u");
                                                         match choice_res {
-                                                            Ok((pos, value))
-                                                            =>
-                                                            Ok((pos, value)),
-                                                            Err(..) =>
+                                                            Matched(pos,
+                                                                    value) =>
+                                                            Matched(pos,
+                                                                    value),
+                                                            Failed =>
                                                             parse_eolChar(input,
                                                                           pos),
                                                         }
@@ -2971,85 +2925,83 @@ fn parse_simpleEscapeSequence(input: &str, pos: uint) ->
                                         }
                                     };
                                 match assert_res {
-                                    Err(..) => Ok((pos, ())),
-                                    Ok(..) => Err(pos),
+                                    Failed => Matched(pos, ()),
+                                    Matched(..) => Failed,
                                 }
                             };
                         match seq_res {
-                            Err(pos) => { Err(pos) }
-                            Ok((pos, _)) => {
+                            Matched(pos, _) => {
                                 {
                                     let seq_res = any_char(input, pos);
                                     match seq_res {
-                                        Err(pos) => { Err(pos) }
-                                        Ok((pos, _)) => {
+                                        Matched(pos, _) => {
                                             {
                                                 let match_str =
                                                     input.slice(start_pos,
                                                                 pos);
-                                                Ok((pos,
-                                                    match match_str.char_at(1)
-                                                        {
-                                                        'n' => '\n',
-                                                        'r' => '\r',
-                                                        't' => '\t',
-                                                        x => x,
-                                                    }))
+                                                Matched(pos,
+                                                        match match_str.char_at(1)
+                                                            {
+                                                            'n' => '\n',
+                                                            'r' => '\r',
+                                                            't' => '\t',
+                                                            x => x,
+                                                        })
                                             }
                                         }
+                                        Failed => Failed,
                                     }
                                 }
                             }
+                            Failed => Failed,
                         }
                     }
                 }
+                Failed => Failed,
             }
         }
     }
 }
-fn parse_zeroEscapeSequence(input: &str, pos: uint) ->
- Result<(uint, char), uint> {
+fn parse_zeroEscapeSequence(input: &str, pos: uint) -> ParseResult<char> {
     {
         let start_pos = pos;
         {
             let seq_res = slice_eq(input, pos, "\\0");
             match seq_res {
-                Err(pos) => { Err(pos) }
-                Ok((pos, _)) => {
+                Matched(pos, _) => {
                     {
                         let seq_res =
                             {
                                 let assert_res = parse_digit(input, pos);
                                 match assert_res {
-                                    Err(..) => Ok((pos, ())),
-                                    Ok(..) => Err(pos),
+                                    Failed => Matched(pos, ()),
+                                    Matched(..) => Failed,
                                 }
                             };
                         match seq_res {
-                            Err(pos) => { Err(pos) }
-                            Ok((pos, _)) => {
+                            Matched(pos, _) => {
                                 {
                                     let match_str =
                                         input.slice(start_pos, pos);
-                                    Ok((pos, 0u8 as char))
+                                    Matched(pos, 0u8 as char)
                                 }
                             }
+                            Failed => Failed,
                         }
                     }
                 }
+                Failed => Failed,
             }
         }
     }
 }
-fn parse_hexEscapeSequence(input: &str, pos: uint) ->
- Result<(uint, char), uint> {
+fn parse_hexEscapeSequence(input: &str, pos: uint) -> ParseResult<char> {
     {
         let start_pos = pos;
         {
             let seq_res = slice_eq(input, pos, "\\x");
             match seq_res {
-                Err(pos) => { Err(pos) }
-                Ok((pos, _)) => {
+                Matched(pos, _) => {
                     {
                         let seq_res =
                             {
@@ -3057,57 +3009,56 @@ fn parse_hexEscapeSequence(input: &str, pos: uint) ->
                                 {
                                     let seq_res = parse_hexDigit(input, pos);
                                     match seq_res {
-                                        Err(pos) => { Err(pos) }
-                                        Ok((pos, _)) => {
+                                        Matched(pos, _) => {
                                             {
                                                 let seq_res =
                                                     parse_hexDigit(input,
                                                                    pos);
                                                 match seq_res {
-                                                    Err(pos) => { Err(pos) }
-                                                    Ok((pos, _)) => {
+                                                    Matched(pos, _) => {
                                                         {
                                                             let match_str =
                                                                 input.slice(start_pos,
                                                                             pos);
-                                                            Ok((pos,
-                                                                from_str_radix::<int>(match_str,
-                                                                                      16)))
+                                                            Matched(pos,
+                                                                    from_str_radix::<int>(match_str,
+                                                                                          16))
                                                         }
                                                     }
+                                                    Failed => Failed,
                                                 }
                                             }
                                         }
+                                        Failed => Failed,
                                     }
                                 }
                             };
                         match seq_res {
-                            Err(pos) => { Err(pos) }
-                            Ok((pos, value)) => {
+                            Matched(pos, value) => {
                                 {
                                     let match_str =
                                         input.slice(start_pos, pos);
-                                    Ok((pos,
-                                        char::from_u32(value.unwrap() as
-                                                           u32).unwrap()))
+                                    Matched(pos,
+                                            char::from_u32(value.unwrap() as
+                                                               u32).unwrap())
                                 }
                             }
+                            Failed => Failed,
                         }
                     }
                 }
+                Failed => Failed,
             }
         }
     }
 }
-fn parse_unicodeEscapeSequence(input: &str, pos: uint) ->
- Result<(uint, char), uint> {
+fn parse_unicodeEscapeSequence(input: &str, pos: uint) -> ParseResult<char> {
     {
         let start_pos = pos;
         {
             let seq_res = slice_eq(input, pos, "\\u");
             match seq_res {
-                Err(pos) => { Err(pos) }
-                Ok((pos, _)) => {
+                Matched(pos, _) => {
                     {
                         let seq_res =
                             {
@@ -3115,147 +3066,145 @@ fn parse_unicodeEscapeSequence(input: &str, pos: uint) ->
                                 {
                                     let seq_res = parse_hexDigit(input, pos);
                                     match seq_res {
-                                        Err(pos) => { Err(pos) }
-                                        Ok((pos, _)) => {
+                                        Matched(pos, _) => {
                                             {
                                                 let seq_res =
                                                     parse_hexDigit(input,
                                                                    pos);
                                                 match seq_res {
-                                                    Err(pos) => { Err(pos) }
-                                                    Ok((pos, _)) => {
+                                                    Matched(pos, _) => {
                                                         {
                                                             let seq_res =
                                                                 parse_hexDigit(input,
                                                                                pos);
                                                             match seq_res {
-                                                                Err(pos) => {
-                                                                    Err(pos)
-                                                                }
-                                                                Ok((pos, _))
-                                                                => {
+                                                                Matched(pos,
+                                                                        _) =>
+                                                                {
                                                                     {
                                                                         let seq_res =
                                                                             parse_hexDigit(input,
                                                                                            pos);
                                                                         match seq_res
                                                                             {
-                                                                            Err(pos)
-                                                                            =>
-                                                                            {
-                                                                                Err(pos)
-                                                                            }
-                                                                            Ok((pos,
-                                                                                _))
+                                                                            Matched(pos,
+                                                                                    _)
                                                                             =>
                                                                             {
                                                                                 {
                                                                                     let match_str =
                                                                                         input.slice(start_pos,
                                                                                                     pos);
-                                                                                    Ok((pos,
-                                                                                        from_str_radix::<int>(match_str,
-                                                                                                              16)))
+                                                                                    Matched(pos,
+                                                                                            from_str_radix::<int>(match_str,
+                                                                                                                  16))
                                                                                 }
                                                                             }
+                                                                            Failed
+                                                                            =>
+                                                                            Failed,
                                                                         }
                                                                     }
                                                                 }
+                                                                Failed =>
+                                                                Failed,
                                                             }
                                                         }
                                                     }
+                                                    Failed => Failed,
                                                 }
                                             }
                                         }
+                                        Failed => Failed,
                                     }
                                 }
                             };
                         match seq_res {
-                            Err(pos) => { Err(pos) }
-                            Ok((pos, value)) => {
+                            Matched(pos, value) => {
                                 {
                                     let match_str =
                                         input.slice(start_pos, pos);
-                                    Ok((pos,
-                                        char::from_u32(value.unwrap() as
-                                                           u32).unwrap()))
+                                    Matched(pos,
+                                            char::from_u32(value.unwrap() as
+                                                               u32).unwrap())
                                 }
                             }
+                            Failed => Failed,
                         }
                     }
                 }
+                Failed => Failed,
             }
         }
     }
 }
-fn parse_eolEscapeSequence(input: &str, pos: uint) ->
- Result<(uint, char), uint> {
+fn parse_eolEscapeSequence(input: &str, pos: uint) -> ParseResult<char> {
     {
         let start_pos = pos;
         {
             let seq_res = slice_eq(input, pos, "\\");
             match seq_res {
-                Err(pos) => { Err(pos) }
-                Ok((pos, _)) => {
+                Matched(pos, _) => {
                     {
                         let seq_res = parse_eol(input, pos);
                         match seq_res {
-                            Err(pos) => { Err(pos) }
-                            Ok((pos, eol)) => {
+                            Matched(pos, eol) => {
                                 {
                                     let match_str =
                                         input.slice(start_pos, pos);
-                                    Ok((pos, '\n'))
+                                    Matched(pos, '\n')
                                 }
                             }
+                            Failed => Failed,
                         }
                     }
                 }
+                Failed => Failed,
             }
         }
     }
 }
-fn parse_digit(input: &str, pos: uint) -> Result<(uint, ()), uint> {
+fn parse_digit(input: &str, pos: uint) -> ParseResult<()> {
     if input.len() > pos {
         let ::std::str::CharRange { ch: ch, next: next } =
             input.char_range_at(pos);
-        match ch { '0' ..'9' => Ok((next, ())), _ => Err(pos), }
-    } else { Err(pos) }
+        match ch { '0' ..'9' => Matched(next, ()), _ => Failed, }
+    } else { Failed }
 }
-fn parse_hexDigit(input: &str, pos: uint) -> Result<(uint, ()), uint> {
+fn parse_hexDigit(input: &str, pos: uint) -> ParseResult<()> {
     if input.len() > pos {
         let ::std::str::CharRange { ch: ch, next: next } =
             input.char_range_at(pos);
         match ch {
-            '0' ..'9' | 'a' ..'f' | 'A' ..'F' => Ok((next, ())),
-            _ => Err(pos),
+            '0' ..'9' | 'a' ..'f' | 'A' ..'F' => Matched(next, ()),
+            _ => Failed,
         }
-    } else { Err(pos) }
+    } else { Failed }
 }
-fn parse_letter(input: &str, pos: uint) -> Result<(uint, ()), uint> {
+fn parse_letter(input: &str, pos: uint) -> ParseResult<()> {
     {
         let choice_res = parse_lowerCaseLetter(input, pos);
         match choice_res {
-            Ok((pos, value)) => Ok((pos, value)),
-            Err(..) => parse_upperCaseLetter(input, pos),
+            Matched(pos, value) => Matched(pos, value),
+            Failed => parse_upperCaseLetter(input, pos),
         }
     }
 }
-fn parse_lowerCaseLetter(input: &str, pos: uint) -> Result<(uint, ()), uint> {
+fn parse_lowerCaseLetter(input: &str, pos: uint) -> ParseResult<()> {
     if input.len() > pos {
         let ::std::str::CharRange { ch: ch, next: next } =
             input.char_range_at(pos);
-        match ch { 'a' ..'z' => Ok((next, ())), _ => Err(pos), }
-    } else { Err(pos) }
+        match ch { 'a' ..'z' => Matched(next, ()), _ => Failed, }
+    } else { Failed }
 }
-fn parse_upperCaseLetter(input: &str, pos: uint) -> Result<(uint, ()), uint> {
+fn parse_upperCaseLetter(input: &str, pos: uint) -> ParseResult<()> {
     if input.len() > pos {
         let ::std::str::CharRange { ch: ch, next: next } =
             input.char_range_at(pos);
-        match ch { 'A' ..'Z' => Ok((next, ())), _ => Err(pos), }
-    } else { Err(pos) }
+        match ch { 'A' ..'Z' => Matched(next, ()), _ => Failed, }
+    } else { Failed }
 }
-fn parse___(input: &str, pos: uint) -> Result<(uint, ()), uint> {
+fn parse___(input: &str, pos: uint) -> ParseResult<()> {
     {
         let mut repeat_pos = pos;
         loop  {
@@ -3264,40 +3213,38 @@ fn parse___(input: &str, pos: uint) -> Result<(uint, ()), uint> {
                 {
                     let choice_res = parse_whitespace(input, pos);
                     match choice_res {
-                        Ok((pos, value)) => Ok((pos, value)),
-                        Err(..) => {
+                        Matched(pos, value) => Matched(pos, value),
+                        Failed => {
                             let choice_res = parse_eol(input, pos);
                             match choice_res {
-                                Ok((pos, value)) => Ok((pos, value)),
-                                Err(..) => parse_comment(input, pos),
+                                Matched(pos, value) => Matched(pos, value),
+                                Failed => parse_comment(input, pos),
                             }
                         }
                     }
                 };
             match step_res {
-                Ok((newpos, value)) => { repeat_pos = newpos; }
-                Err(..) => { break ; }
+                Matched(newpos, value) => { repeat_pos = newpos; }
+                Failed => { break ; }
             }
         }
-        Ok((repeat_pos, ()))
+        Matched(repeat_pos, ())
     }
 }
-fn parse_comment(input: &str, pos: uint) -> Result<(uint, ()), uint> {
+fn parse_comment(input: &str, pos: uint) -> ParseResult<()> {
     {
         let choice_res = parse_singleLineComment(input, pos);
         match choice_res {
-            Ok((pos, value)) => Ok((pos, value)),
-            Err(..) => parse_multiLineComment(input, pos),
+            Matched(pos, value) => Matched(pos, value),
+            Failed => parse_multiLineComment(input, pos),
         }
     }
 }
-fn parse_singleLineComment(input: &str, pos: uint) ->
- Result<(uint, ()), uint> {
+fn parse_singleLineComment(input: &str, pos: uint) -> ParseResult<()> {
     {
         let seq_res = slice_eq(input, pos, "//");
         match seq_res {
-            Err(pos) => { Err(pos) }
-            Ok((pos, _)) => {
+            Matched(pos, _) => {
                 {
                     let mut repeat_pos = pos;
                     loop  {
@@ -3309,33 +3256,34 @@ fn parse_singleLineComment(input: &str, pos: uint) ->
                                         let assert_res =
                                             parse_eolChar(input, pos);
                                         match assert_res {
-                                            Err(..) => Ok((pos, ())),
-                                            Ok(..) => Err(pos),
+                                            Failed => Matched(pos, ()),
+                                            Matched(..) => Failed,
                                         }
                                     };
                                 match seq_res {
-                                    Err(pos) => { Err(pos) }
-                                    Ok((pos, _)) => { any_char(input, pos) }
+                                    Matched(pos, _) => {
+                                        any_char(input, pos)
+                                    }
+                                    Failed => Failed,
                                 }
                             };
                         match step_res {
-                            Ok((newpos, value)) => { repeat_pos = newpos; }
-                            Err(..) => { break ; }
+                            Matched(newpos, value) => { repeat_pos = newpos; }
+                            Failed => { break ; }
                         }
                     }
-                    Ok((repeat_pos, ()))
+                    Matched(repeat_pos, ())
                 }
             }
+            Failed => Failed,
         }
     }
 }
-fn parse_multiLineComment(input: &str, pos: uint) ->
- Result<(uint, ()), uint> {
+fn parse_multiLineComment(input: &str, pos: uint) -> ParseResult<()> {
     {
         let seq_res = slice_eq(input, pos, "/*");
         match seq_res {
-            Err(pos) => { Err(pos) }
-            Ok((pos, _)) => {
+            Matched(pos, _) => {
                 {
                     let seq_res =
                         {
@@ -3350,54 +3298,57 @@ fn parse_multiLineComment(input: &str, pos: uint) ->
                                                     slice_eq(input, pos,
                                                              "*/");
                                                 match assert_res {
-                                                    Err(..) => Ok((pos, ())),
-                                                    Ok(..) => Err(pos),
+                                                    Failed =>
+                                                    Matched(pos, ()),
+                                                    Matched(..) => Failed,
                                                 }
                                             };
                                         match seq_res {
-                                            Err(pos) => { Err(pos) }
-                                            Ok((pos, _)) => {
+                                            Matched(pos, _) => {
                                                 any_char(input, pos)
                                             }
+                                            Failed => Failed,
                                         }
                                     };
                                 match step_res {
-                                    Ok((newpos, value)) => {
+                                    Matched(newpos, value) => {
                                         repeat_pos = newpos;
                                     }
-                                    Err(..) => { break ; }
+                                    Failed => { break ; }
                                 }
                             }
-                            Ok((repeat_pos, ()))
+                            Matched(repeat_pos, ())
                         };
                     match seq_res {
-                        Err(pos) => { Err(pos) }
-                        Ok((pos, _)) => { slice_eq(input, pos, "*/") }
+                        Matched(pos, _) => { slice_eq(input, pos, "*/") }
+                        Failed => Failed,
                     }
                 }
             }
+            Failed => Failed,
         }
     }
 }
-fn parse_eol(input: &str, pos: uint) -> Result<(uint, ()), uint> {
+fn parse_eol(input: &str, pos: uint) -> ParseResult<()> {
     {
         let choice_res = slice_eq(input, pos, "\n");
         match choice_res {
-            Ok((pos, value)) => Ok((pos, value)),
-            Err(..) => {
+            Matched(pos, value) => Matched(pos, value),
+            Failed => {
                 let choice_res = slice_eq(input, pos, "\r\n");
                 match choice_res {
-                    Ok((pos, value)) => Ok((pos, value)),
-                    Err(..) => {
+                    Matched(pos, value) => Matched(pos, value),
+                    Failed => {
                         let choice_res = slice_eq(input, pos, "\r");
                         match choice_res {
-                            Ok((pos, value)) => Ok((pos, value)),
-                            Err(..) => {
+                            Matched(pos, value) => Matched(pos, value),
+                            Failed => {
                                 let choice_res =
                                     slice_eq(input, pos, "\u2028");
                                 match choice_res {
-                                    Ok((pos, value)) => Ok((pos, value)),
-                                    Err(..) => slice_eq(input, pos, "\u2029"),
+                                    Matched(pos, value) =>
+                                    Matched(pos, value),
+                                    Failed => slice_eq(input, pos, "\u2029"),
                                 }
                             }
                         }
@@ -3407,30 +3358,30 @@ fn parse_eol(input: &str, pos: uint) -> Result<(uint, ()), uint> {
         }
     }
 }
-fn parse_eolChar(input: &str, pos: uint) -> Result<(uint, ()), uint> {
+fn parse_eolChar(input: &str, pos: uint) -> ParseResult<()> {
     if input.len() > pos {
         let ::std::str::CharRange { ch: ch, next: next } =
             input.char_range_at(pos);
         match ch {
-            '\n' | '\r' | '\u2028' | '\u2029' => Ok((next, ())),
-            _ => Err(pos),
+            '\n' | '\r' | '\u2028' | '\u2029' => Matched(next, ()),
+            _ => Failed,
         }
-    } else { Err(pos) }
+    } else { Failed }
 }
-fn parse_whitespace(input: &str, pos: uint) -> Result<(uint, ()), uint> {
+fn parse_whitespace(input: &str, pos: uint) -> ParseResult<()> {
     if input.len() > pos {
         let ::std::str::CharRange { ch: ch, next: next } =
             input.char_range_at(pos);
         match ch {
             ' ' | '\t' | '\xa0' | '\ufeff' | '\u1680' | '\u180e' | '\u2000'
-            ..'\u200a' | '\u202f' | '\u205f' | '\u3000' => Ok((next, ())),
-            _ => Err(pos),
+            ..'\u200a' | '\u202f' | '\u205f' | '\u3000' => Matched(next, ()),
+            _ => Failed,
         }
-    } else { Err(pos) }
+    } else { Failed }
 }
 pub fn grammar(input: &str) -> Result<Grammar, String> {
     match parse_grammar(input, 0) {
-        Ok((pos, value)) => {
+        Matched(pos, value) => {
             if pos == input.len() {
                 Ok(value)
             } else {
@@ -3438,6 +3389,6 @@ pub fn grammar(input: &str) -> Result<Grammar, String> {
                             ( input , pos )))
             }
         }
-        Err(pos) => Err(format!("Error at {}" , pos_to_line ( input , pos ))),
+        Failed => Err(format!("Error at ?")),
     }
 }
