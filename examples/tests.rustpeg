@@ -17,6 +17,3 @@ list -> Vec<int>
 boundaries -> String
 	= "foo" { match_str.to_string() }
 
-#[export]
-borrowed -> &str
-	= [a-z]+ { match_str }
